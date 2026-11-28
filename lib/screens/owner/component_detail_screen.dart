@@ -11,7 +11,7 @@ import 'history_screen.dart';
 import 'record_maintenance_screen.dart';
 import 'sheets.dart';
 
-/// 04a–04f · Component detail
+/// Status and service details of one component.
 class ComponentDetailScreen extends StatelessWidget {
   const ComponentDetailScreen({super.key, required this.componentKey});
 
@@ -30,37 +30,36 @@ class ComponentDetailScreen extends StatelessWidget {
     final cat = app.catalogOf(moto);
     final rule = app.ruleFor(moto, componentKey);
     final s = app.statusOf(moto, rule);
-    final st = HealthStyle.of(s.health);
-    final left = s.kmLeft(moto.odometer);
+    final st = StatusStyle.of(s.status);
+    final left = s.kmLeft(moto.currentOdometer);
     final last = s.lastRecord;
-    final history = app.recordsFor(moto).where((r) => r.items.containsKey(componentKey)).toList();
+    final history = app.recordsFor(moto).where((r) => r.covers(componentKey)).toList();
     final name = rule.componentName;
-    final verb = componentKey == 'engine' || componentKey == 'gear' ? 'change' : 'service';
+    final first = app.firstReadingOf(moto);
 
-    String? reminder;
-    if (s.health == Health.overdue) {
-      reminder = left < 0
-          ? 'Reminder sent ${fmtDate(moto.odometerUpdatedAt)} · $name has passed its ${fmtKm(rule.intervalKm)} interval. Service it soon.'
-          : 'Reminder sent ${fmtDate(moto.odometerUpdatedAt)} · $name has passed its ${fmtMonths(rule.intervalMonths)} interval. Service it soon.';
-    } else if (s.health == Health.dueSoon) {
-      reminder = 'Due-soon reminder sent ${fmtDate(moto.odometerUpdatedAt)} · '
-          '${left > 0 ? '${fmtKm(left)} left before the next ${name.toLowerCase()} $verb.' : 'the time limit for the next ${name.toLowerCase()} $verb is close.'}';
-    }
+    // Stored reminder for the current status, if any.
+    final stored = app.reminderFor(moto, s);
+    final reminder = s.status == MaintenanceStatus.onTrack
+        ? null
+        : stored != null
+            ? '${s.status == MaintenanceStatus.overdue ? 'Reminder' : 'Due-soon reminder'} sent '
+                '${fmtDate(stored.createdAt)} · ${stored.message}'
+            : Reminder.fromStatus(moto, s, now: DateTime.now())!.message;
 
     return AppPage(children: [
       TopBar(name),
-      VehicleChip(vehicleLine(app, moto)),
+      MotorcycleChip(motorcycleLine(app, moto)),
       // Hero
       CardBox(
         radius: 20,
         padding: const EdgeInsets.all(18),
-        borderColor: s.health == Health.overdue ? AppColors.danger : AppColors.border,
-        borderWidth: s.health == Health.overdue ? 1.5 : 1,
+        borderColor: s.status == MaintenanceStatus.overdue ? AppColors.danger : AppColors.border,
+        borderWidth: s.status == MaintenanceStatus.overdue ? 1.5 : 1,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 10, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             IconBox(componentIconName(componentKey), size: 44, radius: 12, iconSize: 22, bg: st.iconBg, color: st.icon),
             const Spacer(),
-            StatusBadge(s.health),
+            StatusBadge(s.status),
           ]),
           Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, spacing: 6, children: [
             Text(fmtKm(s.usedKm), style: ts(28, bold)),
@@ -76,7 +75,7 @@ class ComponentDetailScreen extends StatelessWidget {
         ]),
       ),
       if (reminder != null) Note(reminder, icon: 'bell', bg: st.soft, iconColor: st.icon, textColor: st.text),
-      SectionHeader('Next service'),
+      const SectionHeader('Next service'),
       IntrinsicHeight(
         child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 10, children: [
           Expanded(child: _Tile(icon: 'gauge', label: 'At odometer', value: fmtKm(s.nextKm))),
@@ -84,26 +83,26 @@ class ComponentDetailScreen extends StatelessWidget {
         ]),
       ),
       Text('Whichever comes first, based on the Admin rule.', style: ts(12, regular, AppColors.muted)),
-      SectionHeader('Maintenance rule'),
+      const SectionHeader('Maintenance rule'),
       CardBox(
         child: Column(spacing: 10, children: [
           InfoRow('Interval', 'Every ${fmtKm(rule.intervalKm)} or ${fmtMonths(rule.intervalMonths)}'),
-          InfoRow('Applies to', '${cat.name} · ${cat.year}'),
-          InfoRow('Set by', 'Admin · ${rule.source.isEmpty ? "Owner's manual" : rule.source}'),
+          InfoRow('Applies to', '${cat.name} · ${cat.modelYear}'),
+          InfoRow('Set by', 'Admin · ${rule.sourceReference.isEmpty ? "Owner's manual" : rule.sourceReference}'),
         ]),
       ),
-      SectionHeader('Last service'),
+      const SectionHeader('Last service'),
       CardBox(
         child: last == null
             ? Text(
-                'No service recorded yet. Status is counted from the odometer at registration '
-                '(${fmtKm(moto.registrationOdometer)}, ${fmtDate(moto.registeredAt)}).',
+                'No service recorded yet. Status is counted from the first odometer reading '
+                '(${fmtKm(first.valueKm)}, ${fmtDate(first.recordedAt)}).',
                 style: ts(13, regular, AppColors.muted, 1.4))
             : Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 10, children: [
-                InfoRow('Date', fmtDate(last.date)),
-                InfoRow('Odometer', fmtKm(last.odometer)),
-                InfoRow('Logged by', last.byMechanic ? 'Mechanic · ${last.workshop}' : 'You'),
-                InfoRow('Work done', last.items[componentKey] ?? ''),
+                InfoRow('Date', fmtDate(last.serviceDate)),
+                InfoRow('Odometer', fmtKm(last.odometerKm)),
+                InfoRow('Logged by', recordedByText(last, app.currentUser?.userId)),
+                InfoRow('Work done', last.workFor(componentKey) ?? ''),
                 if (last.receipt != null)
                   Material(
                     color: AppColors.accentSoft,
@@ -135,8 +134,8 @@ class ComponentDetailScreen extends StatelessWidget {
                     IconBox(r.byMechanic ? 'wrench' : 'user', size: 32, radius: 9, iconSize: 16),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
-                        Text(r.items[componentKey] ?? '', style: ts(14, semiBold)),
-                        Text('${fmtDate(r.date)} · ${fmtKm(r.odometer)} · ${r.loggedBy}',
+                        Text(r.workFor(componentKey) ?? '', style: ts(14, semiBold)),
+                        Text('${fmtDate(r.serviceDate)} · ${fmtKm(r.odometerKm)} · ${recordedByText(r, app.currentUser?.userId)}',
                             style: ts(12, regular, AppColors.muted)),
                       ]),
                     ),

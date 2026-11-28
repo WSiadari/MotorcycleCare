@@ -8,7 +8,7 @@ import '../../widgets/common.dart';
 import 'component_status_screen.dart';
 import 'sheets.dart';
 
-/// 02 · Update Odometer → Odometer valid? → 02b Confirm (Save) / 02c Confirm (Use Latest)
+/// Update or confirm the current odometer.
 class UpdateOdometerScreen extends StatefulWidget {
   const UpdateOdometerScreen({super.key});
 
@@ -29,7 +29,7 @@ class _UpdateOdometerScreenState extends State<UpdateOdometerScreen> {
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: '${AppScope.read(context).selected!.odometer}');
+    _ctrl = TextEditingController(text: '${AppScope.read(context).selected!.currentOdometer}');
   }
 
   @override
@@ -58,7 +58,7 @@ class _UpdateOdometerScreenState extends State<UpdateOdometerScreen> {
   Future<void> _useLatest(AppState app) async {
     final moto = app.selected!;
     final ok = await confirmOdometerSheet(context,
-        km: moto.odometer,
+        km: moto.currentOdometer,
         message: 'Keep the latest reading from ${fmtDate(moto.odometerUpdatedAt)} and refresh the maintenance schedule.');
     if (!ok || !mounted) return;
     setState(() => _busy = true);
@@ -81,12 +81,12 @@ class _UpdateOdometerScreenState extends State<UpdateOdometerScreen> {
 
     return AppPage(children: [
       const TopBar('Update Odometer'),
-      VehicleChip(vehicleLine(app, moto)),
+      MotorcycleChip(motorcycleLine(app, moto)),
       CardBox(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
           Text('Latest odometer', style: ts(13, regular, AppColors.muted)),
           Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, spacing: 6, children: [
-            Text(fmtNum(moto.odometer), style: ts(26, bold)),
+            Text(fmtNum(moto.currentOdometer), style: ts(26, bold)),
             Text('km', style: ts(14, medium, AppColors.muted)),
           ]),
           Text('Updated ${fmtDate(moto.odometerUpdatedAt)} · by you', style: ts(12, regular, AppColors.muted)),
@@ -104,17 +104,17 @@ class _UpdateOdometerScreenState extends State<UpdateOdometerScreen> {
           onChanged: (_) => setState(() => _serverError = null),
         ),
         if (error != null)
-          ErrorLine(value != null && value < moto.odometer
-              ? "Can't be lower than the latest reading (${fmtKm(moto.odometer)})."
+          ErrorLine(value != null && value < moto.currentOdometer
+              ? "Can't be lower than the latest reading (${fmtKm(moto.currentOdometer)})."
               : error)
         else if (_serverError != null)
           ErrorLine(_serverError!)
         else
-          Helper('Must be equal to or higher than ${fmtKm(moto.odometer)}.'),
+          Helper('Must be equal to or higher than ${fmtKm(moto.currentOdometer)}.'),
       ]),
       const Note('Saving recalculates every component status using the Admin maintenance rules (interval km & months).'),
       AppButton('Save Odometer', busy: _busy, onPressed: error != null ? null : () => _save(app, value!)),
-      AppButton('Use Latest Odometer (${fmtKm(moto.odometer)})',
+      AppButton('Use Latest Odometer (${fmtKm(moto.currentOdometer)})',
           kind: ButtonKind.secondary, onPressed: _busy ? null : () => _useLatest(app)),
     ]);
   }

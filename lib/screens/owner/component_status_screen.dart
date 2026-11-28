@@ -11,9 +11,9 @@ import 'history_screen.dart';
 import 'sheets.dart';
 import 'update_odometer_screen.dart';
 
-String vehicleLine(AppState app, Motorcycle m) => '${app.catalogOf(m).name} · ${m.plate} · ${fmtKm(m.odometer)}';
+String motorcycleLine(AppState app, Motorcycle m) => '${app.catalogOf(m).name} · ${m.plateNumber} · ${fmtKm(m.currentOdometer)}';
 
-/// 01 · Component Status (View Maintenance Schedule / View Component Status)
+/// Maintenance schedule and status of every component.
 class ComponentStatusScreen extends StatelessWidget {
   const ComponentStatusScreen({super.key});
 
@@ -28,7 +28,6 @@ class ComponentStatusScreen extends StatelessWidget {
     final moto = app.selected;
     if (moto == null) return const Scaffold(body: SizedBox.shrink());
     final statuses = app.statusesFor(moto);
-    final alerts = app.alertsFor(moto);
 
     final rows = <Widget>[];
     for (var i = 0; i < statuses.length; i += 2) {
@@ -42,9 +41,9 @@ class ComponentStatusScreen extends StatelessWidget {
 
     return AppPage(children: [
       TopBar('Component Status', actions: [
-        SquareButton('bell', tooltip: 'Reminders', badge: alerts.length, onTap: () => showReminders(context)),
+        SquareButton('bell', tooltip: 'Reminders', badge: app.unreadReminders(moto), onTap: () => showReminders(context)),
       ]),
-      VehicleChip(vehicleLine(app, moto),
+      MotorcycleChip(motorcycleLine(app, moto),
           onTap: () => Navigator.of(context).push(UpdateOdometerScreen.route())),
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 12, children: rows),
       const Note('Based on Admin rules and the last service record, whether logged by you or a mechanic.'),
@@ -61,8 +60,8 @@ class _ComponentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final st = HealthStyle.of(s.health);
-    final overdue = s.health == Health.overdue;
+    final st = StatusStyle.of(s.status);
+    final overdue = s.status == MaintenanceStatus.overdue;
     return CardBox(
       borderColor: overdue ? AppColors.danger : AppColors.border,
       borderWidth: overdue ? 1.5 : 1,
@@ -71,7 +70,7 @@ class _ComponentCard extends StatelessWidget {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           IconBox(componentIconName(s.rule.componentKey), bg: st.iconBg, color: st.icon),
           const Spacer(),
-          StatusBadge(s.health),
+          StatusBadge(s.status),
         ]),
         const SizedBox(height: 2),
         Text(s.rule.componentName, style: ts(15, semiBold)),

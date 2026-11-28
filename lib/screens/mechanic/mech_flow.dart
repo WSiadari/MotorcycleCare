@@ -9,20 +9,15 @@ import '../../models/models.dart';
 import '../../state/app_state.dart';
 import '../../utils/format.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/common.dart' show recordedByText;
 import 'mech_ui.dart';
 import 'mechanic_shell.dart';
-
-// Mechanic Activity Diagram, step by step:
-// Search Motorcycle → Motorcycle Found? → (No) Motorcycle Not Found
-//   → (Yes) View Motorcycle Information → View Maintenance History → Inspect & Repair Motorcycle
-//   → Record Service Details → Attach Service Receipt? (Attach / Skip) → Service Record Complete?
-//   → (No) Correct Service Details → (Yes) Save Service Record → Service Record Saved / History Updated
 
 Route<void> _r(Widget w) => MaterialPageRoute(builder: (_) => w);
 
 void backToDashboard(BuildContext context) => MechanicShell.goTab(context, 0);
 
-// ====================================================================== 03 Motorcycle Not Found
+// ====================================================================== Motorcycle Not Found
 class NotFoundScreen extends StatelessWidget {
   const NotFoundScreen({super.key, required this.plate});
 
@@ -32,7 +27,7 @@ class NotFoundScreen extends StatelessWidget {
   Widget build(BuildContext context) => MechPage(
         header: const MechHeader('Search Result'),
         bottom: [
-          MechButton('Add Motorcycle',
+          MechButton('Add Motorcycle for Customer',
               onTap: () => Navigator.of(context).pushReplacement(_r(AddMotorcycleScreen(plate: plate)))),
           MechButton('Search Again', icon: 'search', kind: MechButtonKind.soft, onTap: () => MechanicShell.goTab(context, 1)),
           MechButton('Back to Dashboard', kind: MechButtonKind.soft, onTap: () => backToDashboard(context)),
@@ -68,12 +63,12 @@ class NotFoundScreen extends StatelessWidget {
           Text('Motorcycle Not Found', textAlign: TextAlign.center, style: mt(22, mXBold)),
           Text("We couldn't find a motorcycle with plate $plate. Please check the plate number and try again.",
               textAlign: TextAlign.center, style: mt(13, mMedium, MC.muted, 1.45)),
-          const InfoBanner('The owner must register the motorcycle in Motorcycle Care first.'),
+          const InfoBanner('Check the plate, or register the motorcycle for the customer with Add Motorcycle.'),
         ],
       );
 }
 
-// ====================================================================== 04 Motorcycle Information
+// ====================================================================== Motorcycle Information
 class MotorcycleInfoScreen extends StatelessWidget {
   const MotorcycleInfoScreen({super.key, required this.motorcycleId});
 
@@ -92,12 +87,12 @@ class MotorcycleInfoScreen extends StatelessWidget {
       bottom: [
         MechButton('Start Inspection', icon: 'wrench', onTap: () async {
           await app.startJob(m, _jobNote(app, m));
-          if (context.mounted) Navigator.of(context).push(_r(InspectScreen(motorcycleId: m.id)));
+          if (context.mounted) Navigator.of(context).push(_r(InspectScreen(motorcycleId: m.motorcycleId)));
         }),
         MechButton('View Maintenance History',
             icon: 'clock',
             kind: MechButtonKind.soft,
-            onTap: () => Navigator.of(context).push(_r(MechHistoryScreen(motorcycleId: m.id)))),
+            onTap: () => Navigator.of(context).push(_r(MechHistoryScreen(motorcycleId: m.motorcycleId)))),
       ],
       children: [
         Container(
@@ -109,15 +104,15 @@ class MotorcycleInfoScreen extends StatelessWidget {
               const IconSquare('bike', size: 48, radius: 16, iconSize: 24),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
-                  Text(m.plate, style: mt(22, mXBold)),
-                  Text('${cat.name} · ${cat.year}', style: mt(12, mMedium, MC.muted)),
+                  Text(m.plateNumber, style: mt(22, mXBold)),
+                  Text('${cat.name} · ${cat.modelYear}', style: mt(12, mMedium, MC.muted)),
                 ]),
               ),
               StatusChip.ok('Found'),
             ]),
             KV('Owner', app.ownerOf(m)?.fullName ?? '—'),
-            KV('Latest Odometer', fmtKm(m.odometer), valueColor: MC.accentText),
-            KV('Last Service', last == null ? 'Not serviced yet' : fmtDate(last.date)),
+            KV('Latest Odometer', fmtKm(m.currentOdometer), valueColor: MC.accentText),
+            KV('Last Service', last == null ? 'Not serviced yet' : fmtDate(last.serviceDate)),
           ]),
         ),
         Text('Component Status', style: mt(16, mXBold)),
@@ -131,7 +126,7 @@ class MotorcycleInfoScreen extends StatelessWidget {
                 height: 46,
                 child: Row(children: [
                   Expanded(child: Text(s.rule.componentName, style: mt(14, mSemi))),
-                  StatusChip.health(s.health),
+                  StatusChip.status(s.status),
                 ]),
               ),
             ],
@@ -148,7 +143,7 @@ String _jobNote(AppState app, Motorcycle m) {
   return alerts.isEmpty ? 'Routine check' : alerts.join(' + ');
 }
 
-// ====================================================================== 05 Maintenance History
+// ====================================================================== Maintenance History
 enum _HistFilter { all, byMe, byMechanic }
 
 /// Maintenance history of one motorcycle, or — without [motorcycleId] — every service the mechanic recorded.
@@ -167,14 +162,14 @@ class _MechHistoryScreenState extends State<MechHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
-    final me = app.currentUser?.id;
+    final me = app.currentUser?.userId;
     if (me == null) return const SizedBox.shrink();
     final moto = widget.motorcycleId == null ? null : app.motorcycleById(widget.motorcycleId!);
     var records = moto == null ? app.myServices : app.recordsFor(moto);
     records = switch (_filter) {
       _HistFilter.all => records,
-      _HistFilter.byMe => records.where((r) => r.recordedBy == me).toList(),
-      _HistFilter.byMechanic => records.where((r) => r.byMechanic && r.recordedBy != me).toList(),
+      _HistFilter.byMe => records.where((r) => r.recordedByUserId == me).toList(),
+      _HistFilter.byMechanic => records.where((r) => r.byMechanic && r.recordedByUserId != me).toList(),
     };
     return MechPage(
       header: MechHeader(moto == null ? 'Service History' : 'Maintenance History'),
@@ -213,7 +208,7 @@ class _MechHistoryScreenState extends State<MechHistoryScreen> {
 class _RecordCard extends StatelessWidget {
   const _RecordCard({required this.record, required this.showPlate});
 
-  final MaintenanceRecord record;
+  final ServiceRecord record;
   final bool showPlate;
 
   @override
@@ -221,19 +216,19 @@ class _RecordCard extends StatelessWidget {
     final app = AppScope.of(context);
     final m = app.motorcycleById(record.motorcycleId);
     final names = {if (m != null) for (final r in app.rulesFor(m)) r.componentKey: r.componentName};
-    final who = record.recordedByName ?? (record.byMechanic ? record.workshop! : 'Owner');
-    final by = record.byMechanic && record.workshop != who ? '$who · ${record.workshop}' : (record.byMechanic ? who : '$who · Self-service');
+    final who = record.recordedByName ?? record.workshopName ?? 'Owner';
+    final by = recordedByText(record, app.currentUser?.userId).replaceFirst('Mechanic · ', '');
     return MechCard(
       radius: 20,
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
         Row(children: [
-          Expanded(child: Text(fmtDate(record.date), style: mt(14, mBold))),
-          Text(fmtKm(record.odometer), style: mt(13, mBold, MC.accentText)),
+          Expanded(child: Text(fmtDate(record.serviceDate), style: mt(14, mBold))),
+          Text(fmtKm(record.odometerKm), style: mt(13, mBold, MC.accentText)),
         ]),
         if (showPlate && m != null) Text(motoLine(app, m), style: mt(12, mSemi, MC.muted)),
         Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final k in record.items.keys)
+          for (final k in record.componentKeys)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -255,11 +250,11 @@ class _RecordCard extends StatelessWidget {
   }
 }
 
-// ====================================================================== 06 Receipt Detail
+// ====================================================================== Receipt Detail
 class ReceiptDetailScreen extends StatefulWidget {
   const ReceiptDetailScreen({super.key, required this.record});
 
-  final MaintenanceRecord record;
+  final ServiceRecord record;
 
   @override
   State<ReceiptDetailScreen> createState() => _ReceiptDetailScreenState();
@@ -274,15 +269,14 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     final r = widget.record;
     final receipt = r.receipt!;
     final m = app.motorcycleById(r.motorcycleId);
-    final rules = m == null ? <MaintenanceRule>[] : app.rulesFor(m);
     final lines = [
-      for (final k in r.items.keys)
-        (MockData.receiptLabels[k] ?? k, rules.where((x) => x.componentKey == k).firstOrNull?.price ?? 0),
+      for (final k in r.componentKeys)
+        (MockData.receiptLabels[k] ?? k, m == null ? 0 : MockData.samplePrice(app.catalogOf(m).motorcycleType, k)),
       if (r.byMechanic) ('Labor', MockData.labourFee),
     ];
     final total = lines.fold<int>(0, (a, l) => a + l.$2);
-    final number = '#${(r.workshop ?? 'MC').split(' ').map((w) => w[0]).join().toUpperCase()}-'
-        '${r.date.year}-${r.date.month.toString().padLeft(2, '0')}${r.date.day.toString().padLeft(2, '0')}';
+    final number = '#${(r.workshopName ?? 'MC').split(' ').map((w) => w[0]).join().toUpperCase()}-'
+        '${r.serviceDate.year}-${r.serviceDate.month.toString().padLeft(2, '0')}${r.serviceDate.day.toString().padLeft(2, '0')}';
     return MechPage(
       header: const MechHeader('Receipt Detail'),
       bottom: [MechButton('Back to History', onTap: () => Navigator.of(context).maybePop())],
@@ -295,7 +289,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
               const IconSquare('receipt'),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
-                  Text(r.workshop ?? 'Self-service', style: mt(16, mXBold)),
+                  Text(r.workshopName ?? 'Self-service', style: mt(16, mXBold)),
                   Text('Receipt $number', style: mt(12, mMedium, MC.muted)),
                 ]),
               ),
@@ -312,15 +306,15 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
                 Expanded(child: Text('Total', style: mt(14, mBold))),
                 Text(fmtRupiah(total), style: mt(18, mXBold, MC.accentText)),
               ]),
-            ] else if (receipt.path != null)
-              ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(receipt.path!), fit: BoxFit.cover))
+            ] else if (receipt.localPath != null)
+              ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(receipt.localPath!), fit: BoxFit.cover))
             else
               FutureBuilder<String?>(
                 future: _url,
                 builder: (_, snap) => snap.data == null
                     ? Padding(
                         padding: const EdgeInsets.all(16),
-                        child: Text(receipt.name, textAlign: TextAlign.center, style: mt(13, mSemi, MC.muted)))
+                        child: Text(receipt.fileName, textAlign: TextAlign.center, style: mt(13, mSemi, MC.muted)))
                     : ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(snap.data!)),
               ),
           ]),
@@ -329,10 +323,10 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
           radius: 20,
           padding: const EdgeInsets.all(16),
           child: Column(spacing: 10, children: [
-            KV('Date', fmtDate(r.date)),
-            KV('Odometer', fmtKm(r.odometer)),
+            KV('Date', fmtDate(r.serviceDate)),
+            KV('Odometer', fmtKm(r.odometerKm)),
             if (m != null) KV('Motorcycle', motoLine(app, m)),
-            KV('Recorded by', r.recordedByName ?? r.loggedBy),
+            KV('Recorded by', r.recordedByName ?? r.workshopName ?? 'Owner'),
           ]),
         ),
       ],
@@ -340,7 +334,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
   }
 }
 
-// ====================================================================== 07 Inspect & Repair
+// ====================================================================== Inspect & Repair
 class InspectScreen extends StatefulWidget {
   const InspectScreen({super.key, required this.motorcycleId, this.preselect});
 
@@ -362,7 +356,7 @@ class _InspectScreenState extends State<InspectScreen> {
     final m = app.motorcycleById(widget.motorcycleId)!;
     _selected = widget.preselect != null
         ? {widget.preselect!}
-        : app.statusesFor(m).where((s) => s.health != Health.onTrack).map((s) => s.rule.componentKey).toSet();
+        : app.statusesFor(m).where((s) => s.status != MaintenanceStatus.onTrack).map((s) => s.rule.componentKey).toSet();
   }
 
   @override
@@ -378,7 +372,7 @@ class _InspectScreenState extends State<InspectScreen> {
             setState(() => _showError = true);
             return;
           }
-          final draft = ServiceDraft(motorcycle: m, components: {..._selected}, date: today(), odometer: m.odometer);
+          final draft = ServiceDraft(motorcycle: m, components: {..._selected}, serviceDate: today(), odometerKm: m.currentOdometer);
           draft.description = _suggestDescription(app, m, draft.components);
           Navigator.of(context).push(_r(ServiceDetailsScreen(draft: draft)));
         }),
@@ -401,10 +395,10 @@ class _InspectScreenState extends State<InspectScreen> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
                   Text(s.rule.componentName, style: mt(14, mBold)),
-                  ProgressBar(math.max(s.kmPercent, s.timePercent) / 100, color: healthBar(s.health)),
+                  ProgressBar(math.max(s.kmPercent, s.timePercent) / 100, color: statusBar(s.status)),
                 ]),
               ),
-              StatusChip.health(s.health),
+              StatusChip.status(s.status),
             ]),
           ),
       ],
@@ -436,13 +430,13 @@ class _Checkbox extends StatelessWidget {
       );
 }
 
-// ====================================================================== 08 Service Details / 10 Correct Details
+// ====================================================================== Service Details / Correct Details
 class ServiceDetailsScreen extends StatefulWidget {
   const ServiceDetailsScreen({super.key, required this.draft, this.correcting = false});
 
   final ServiceDraft draft;
 
-  /// "Service Record Complete? → No → Correct Service Details"
+  /// True when the form is reopened to fix missing or invalid fields.
   final bool correcting;
 
   @override
@@ -451,7 +445,7 @@ class ServiceDetailsScreen extends StatefulWidget {
 
 class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   late final ServiceDraft d = widget.draft;
-  late final _km = TextEditingController(text: '${d.odometer}');
+  late final _km = TextEditingController(text: '${d.odometerKm}');
   late final _desc = TextEditingController(text: d.description);
 
   @override
@@ -462,18 +456,18 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   }
 
   void _store() {
-    d.odometer = int.tryParse(_km.text) ?? 0;
+    d.odometerKm = int.tryParse(_km.text) ?? 0;
     d.description = _desc.text;
   }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: d.date,
-      firstDate: d.motorcycle.registeredAt,
+      initialDate: d.serviceDate,
+      firstDate: dateOnly(AppScope.read(context).firstReadingOf(d.motorcycle).recordedAt),
       lastDate: today(),
     );
-    if (picked != null) setState(() => d.date = picked);
+    if (picked != null) setState(() => d.serviceDate = picked);
   }
 
   @override
@@ -501,12 +495,12 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         if (widget.correcting) const InfoBanner('Review the details below and correct anything that is wrong.'),
         MechField(
           'Service Date',
-          child: SelectBox(value: fmtDate(d.date), placeholder: 'Choose a date', icon: 'cal', onTap: _pickDate),
+          child: SelectBox(value: fmtDate(d.serviceDate), placeholder: 'Choose a date', icon: 'cal', onTap: _pickDate),
         ),
         MechField(
           'Odometer (km)',
           error: issues['odometer'],
-          helper: 'Current record: ${fmtKm(d.motorcycle.odometer)}. Value must be equal or higher.',
+          helper: 'Current record: ${fmtKm(d.motorcycle.currentOdometer)}. Value must be equal or higher.',
           child: MechInput(
             controller: _km,
             icon: 'gauge',
@@ -550,17 +544,17 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   }
 }
 
-/// "Service Record Complete?" — field → problem.
+/// Missing or invalid fields of [d], as field → problem.
 Map<String, String> serviceIssues(AppState app, ServiceDraft d) => {
-      if (d.odometer < d.motorcycle.odometer)
-        'odometer': 'Must be at least ${fmtKm(d.motorcycle.odometer)} (current record).'
-      else if (d.odometer - d.motorcycle.odometer > AppState.maxOdometerJump)
+      if (d.odometerKm < d.motorcycle.currentOdometer)
+        'odometer': 'Must be at least ${fmtKm(d.motorcycle.currentOdometer)} (current record).'
+      else if (d.odometerKm - d.motorcycle.currentOdometer > AppState.maxOdometerJump)
         'odometer': 'That jump looks too big. Check the number.',
       if (d.components.isEmpty) 'components': 'Select at least one component.',
       if (d.description.trim().length < 5) 'description': 'Describe the work done (at least 5 characters).',
     };
 
-/// "Service Chip" (on = orange with check).
+/// Selectable service chip (orange with a check when on).
 class _ServiceChip extends StatelessWidget {
   const _ServiceChip(this.label, {required this.on, required this.onTap});
 
@@ -586,7 +580,7 @@ class _ServiceChip extends StatelessWidget {
       );
 }
 
-// ====================================================================== 09 Attach Receipt
+// ====================================================================== Attach Receipt
 class AttachReceiptScreen extends StatefulWidget {
   const AttachReceiptScreen({super.key, required this.draft});
 
@@ -604,13 +598,14 @@ class _AttachReceiptScreenState extends State<AttachReceiptScreen> {
       final file = await ImagePicker().pickImage(source: source, imageQuality: 85);
       if (file == null) return false;
       final size = await file.length();
-      if (size > 5 * 1024 * 1024) {
-        setState(() => _error = 'File is larger than 5 MB. Choose a smaller photo.');
+      final error = ServiceReceipt.validateFile(fileName: file.name, sizeBytes: size);
+      if (error != null) {
+        setState(() => _error = error);
         return false;
       }
       setState(() {
         _error = null;
-        widget.draft.receipt = Receipt(name: file.name, path: file.path, sizeBytes: size);
+        widget.draft.receipt = ServiceReceipt(fileName: file.name, localPath: file.path, sizeBytes: size);
       });
       return true;
     } catch (_) {
@@ -638,7 +633,7 @@ class _AttachReceiptScreenState extends State<AttachReceiptScreen> {
         Center(
           child: TextButton(
             onPressed: () {
-              setState(() => widget.draft.receipt = null); // Attach Service Receipt? → No → Skip Receipt
+              setState(() => widget.draft.receipt = null);
               _next();
             },
             child: Text('Skip for now', style: mt(14, mBold, MC.muted)),
@@ -668,7 +663,7 @@ class _AttachReceiptScreenState extends State<AttachReceiptScreen> {
                     child: const AppIcon('upload', color: MC.accentText, size: 24),
                   ),
                   Text('Tap to upload receipt', style: mt(15, mBold)),
-                  Text('JPG or PNG · max 5 MB', style: mt(12, mMedium, MC.muted)),
+                  Text('JPG, PNG, WEBP or HEIC · max 5 MB', style: mt(12, mMedium, MC.muted)),
                 ]),
               ),
             ),
@@ -679,7 +674,7 @@ class _AttachReceiptScreenState extends State<AttachReceiptScreen> {
               const IconSquare('image'),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
-                  Text(receipt.name, overflow: TextOverflow.ellipsis, style: mt(14, mBold)),
+                  Text(receipt.fileName, overflow: TextOverflow.ellipsis, style: mt(14, mBold)),
                   Text('${(receipt.sizeBytes / 1048576).toStringAsFixed(1)} MB · Attached', style: mt(12, mMedium, MC.muted)),
                 ]),
               ),
@@ -697,7 +692,7 @@ class _AttachReceiptScreenState extends State<AttachReceiptScreen> {
   }
 }
 
-// ====================================================================== 11 Review Service
+// ====================================================================== Review Service
 class ReviewServiceScreen extends StatefulWidget {
   const ReviewServiceScreen({super.key, required this.draft});
 
@@ -718,7 +713,7 @@ class _ReviewServiceScreenState extends State<ReviewServiceScreen> {
 
   Future<void> _save(AppState app) async {
     final d = widget.draft;
-    if (serviceIssues(app, d).isNotEmpty) return _edit(); // Service Record Complete? → No
+    if (serviceIssues(app, d).isNotEmpty) return _edit();
     setState(() {
       _busy = true;
       _error = null;
@@ -756,8 +751,8 @@ class _ReviewServiceScreenState extends State<ReviewServiceScreen> {
           radius: 20,
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 10, children: [
-            KV('Service Date', fmtDate(d.date)),
-            KV('Odometer', fmtKm(d.odometer), valueColor: MC.accentText),
+            KV('Service Date', fmtDate(d.serviceDate)),
+            KV('Odometer', fmtKm(d.odometerKm), valueColor: MC.accentText),
             Text('Components Serviced', style: mt(12, mMedium, MC.muted)),
             Wrap(spacing: 6, runSpacing: 6, children: [
               for (final k in d.components)
@@ -779,7 +774,7 @@ class _ReviewServiceScreenState extends State<ReviewServiceScreen> {
             const IconSquare('receipt'),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
-                Text(d.receipt?.name ?? 'No receipt', overflow: TextOverflow.ellipsis, style: mt(14, mBold)),
+                Text(d.receipt?.fileName ?? 'No receipt', overflow: TextOverflow.ellipsis, style: mt(14, mBold)),
                 Text(
                     d.receipt == null
                         ? 'Skipped · tap to attach'
@@ -798,7 +793,7 @@ class _ReviewServiceScreenState extends State<ReviewServiceScreen> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                 Text('Notify owner', style: mt(14, mBold)),
-                Text('Send update to $owner', style: mt(12, mMedium, MC.muted)),
+                Text("Update $owner's reminders right away", style: mt(12, mMedium, MC.muted)),
               ]),
             ),
             Switch(
@@ -813,25 +808,25 @@ class _ReviewServiceScreenState extends State<ReviewServiceScreen> {
   }
 }
 
-// ====================================================================== 12 Service Saved
+// ====================================================================== Service Saved
 class ServiceSavedScreen extends StatelessWidget {
   const ServiceSavedScreen({super.key, required this.record, required this.notified});
 
-  final MaintenanceRecord record;
+  final ServiceRecord record;
   final bool notified;
 
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final m = app.motorcycleById(record.motorcycleId)!;
-    final first = app.rulesFor(m).where((r) => record.items.containsKey(r.componentKey)).firstOrNull;
+    final first = app.rulesFor(m).where((r) => record.covers(r.componentKey)).firstOrNull;
     final next = first == null ? null : app.statusOf(m, first);
     return MechPage(
       bottom: [
         MechButton('Back to Dashboard', onTap: () => backToDashboard(context)),
         MechButton('View Maintenance History',
             kind: MechButtonKind.soft,
-            onTap: () => Navigator.of(context).pushReplacement(_r(MechHistoryScreen(motorcycleId: m.id)))),
+            onTap: () => Navigator.of(context).pushReplacement(_r(MechHistoryScreen(motorcycleId: m.motorcycleId)))),
       ],
       children: [
         const SizedBox(height: 60),
@@ -846,8 +841,8 @@ class ServiceSavedScreen extends StatelessWidget {
         ),
         Text('Service Record Saved', textAlign: TextAlign.center, style: mt(24, mXBold)),
         Text(
-          'Maintenance history for ${m.plate} has been updated'
-          '${notified ? ' and the owner has been notified' : ''}.',
+          'Maintenance history for ${m.plateNumber} has been updated'
+          '${notified ? " and the owner's reminders were updated" : ''}.',
           textAlign: TextAlign.center,
           style: mt(13, mMedium, MC.muted, 1.45),
         ),
@@ -862,7 +857,7 @@ class ServiceSavedScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 26 Add Motorcycle
+// ====================================================================== Add Motorcycle
 class AddMotorcycleScreen extends StatefulWidget {
   const AddMotorcycleScreen({super.key, this.plate});
 
@@ -874,7 +869,7 @@ class AddMotorcycleScreen extends StatefulWidget {
 
 class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
   UserAccount? _owner;
-  MotoType? _type;
+  MotorcycleType? _type;
   String? _make, _model;
   int? _year;
   late final _plate = TextEditingController(text: widget.plate ?? '');
@@ -889,8 +884,8 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
     super.dispose();
   }
 
-  Iterable<CatalogModel> _models(AppState app) => app.catalog.where((c) =>
-      (_type == null || c.type == _type) && (_make == null || c.make == _make) && (_model == null || c.model == _model));
+  Iterable<MotorcycleCatalog> _models(AppState app) => app.catalog.where((c) =>
+      (_type == null || c.motorcycleType == _type) && (_make == null || c.make == _make) && (_model == null || c.model == _model));
 
   Future<T?> _pick<T>(String title, List<(T, String, String?)> options) => showMechSheet<T>(context,
       title: title,
@@ -901,7 +896,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
           ]);
 
   Future<void> _save(AppState app) async {
-    final cat = _models(app).where((c) => c.year == _year).firstOrNull;
+    final cat = _models(app).where((c) => c.modelYear == _year).firstOrNull;
     final km = int.tryParse(_km.text);
     setState(() => _errors = {
           if (_owner == null) 'owner': 'Choose the owner.',
@@ -915,7 +910,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
     if (_errors.isNotEmpty) return;
     setState(() => _busy = true);
     final plate = AppState.normalizePlate(_plate.text);
-    final err = await app.addMotorcycle(catalogId: cat!.id, plate: plate, odometer: km!, ownerId: _owner!.id);
+    final err = await app.addMotorcycle(catalogId: cat!.catalogId, plateNumber: plate, odometerKm: km!, ownerId: _owner!.userId);
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
@@ -923,17 +918,17 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
       return;
     }
     final m = app.findByPlate(plate)!;
-    Navigator.of(context).pushReplacement(_r(MotorcycleAddedScreen(motorcycleId: m.id)));
+    Navigator.of(context).pushReplacement(_r(MotorcycleAddedScreen(motorcycleId: m.motorcycleId)));
   }
 
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final catalog = app.catalog;
-    final types = {for (final c in catalog) c.type}.toList();
-    final makes = {for (final c in catalog.where((c) => c.type == _type)) c.make}.toList()..sort();
-    final models = {for (final c in catalog.where((c) => c.type == _type && c.make == _make)) c.model}.toList()..sort();
-    final years = [for (final c in _models(app)) c.year]..sort();
+    final types = {for (final c in catalog) c.motorcycleType}.toList();
+    final makes = {for (final c in catalog.where((c) => c.motorcycleType == _type)) c.make}.toList()..sort();
+    final models = {for (final c in catalog.where((c) => c.motorcycleType == _type && c.make == _make)) c.model}.toList()..sort();
+    final years = [for (final c in _models(app)) c.modelYear]..sort();
     return MechPage(
       header: const MechHeader('Add Motorcycle'),
       bottom: [MechButton('Save Motorcycle', busy: _busy, onTap: () => _save(app))],
@@ -982,7 +977,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
                   onTap: () async {
                     final mk = await _pick('Select Make', [
                       for (final mk in makes)
-                        (mk, mk, '${catalog.where((c) => c.make == mk && c.type == _type).length} models'),
+                        (mk, mk, '${catalog.where((c) => c.make == mk && c.motorcycleType == _type).length} models'),
                     ]);
                     if (mk != null && mk != _make) {
                       setState(() {
@@ -1007,7 +1002,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
                     if (md != null) {
                       setState(() {
                         _model = md;
-                        final ys = [for (final c in _models(app)) c.year];
+                        final ys = [for (final c in _models(app)) c.modelYear];
                         _year = ys.length == 1 ? ys.first : null;
                       });
                     }
@@ -1057,7 +1052,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
   }
 }
 
-// ====================================================================== 27 Motorcycle Added
+// ====================================================================== Motorcycle Added
 class MotorcycleAddedScreen extends StatelessWidget {
   const MotorcycleAddedScreen({super.key, required this.motorcycleId});
 
@@ -1072,7 +1067,7 @@ class MotorcycleAddedScreen extends StatelessWidget {
       bottom: [
         MechButton('Start Inspection', icon: 'wrench', onTap: () async {
           await app.startJob(m, 'Routine check');
-          if (context.mounted) Navigator.of(context).pushReplacement(_r(InspectScreen(motorcycleId: m.id)));
+          if (context.mounted) Navigator.of(context).pushReplacement(_r(InspectScreen(motorcycleId: m.motorcycleId)));
         }),
         MechButton('Back to Dashboard', kind: MechButtonKind.soft, onTap: () => backToDashboard(context)),
       ],
@@ -1088,19 +1083,19 @@ class MotorcycleAddedScreen extends StatelessWidget {
           ),
         ),
         Text('Motorcycle Added', textAlign: TextAlign.center, style: mt(24, mXBold)),
-        Text('The motorcycle is now registered in Motorcycle Care and visible in the owner’s garage.',
+        Text('The motorcycle is now registered in MotorcycleCare and visible in the owner’s garage.',
             textAlign: TextAlign.center, style: mt(13, mMedium, MC.muted, 1.45)),
         MechCard(
           radius: 20,
           padding: const EdgeInsets.all(16),
           child: Column(spacing: 10, children: [
-            KV('Plate Number', m.plate, valueColor: MC.accentText),
+            KV('Plate Number', m.plateNumber, valueColor: MC.accentText),
             KV('Owner', app.ownerOf(m)?.fullName ?? '—'),
-            KV('Type', cat.type.label),
+            KV('Type', cat.motorcycleType.label),
             KV('Make', cat.make),
             KV('Model', cat.model),
-            KV('Model Year', '${cat.year}'),
-            KV('Odometer', fmtKm(m.odometer)),
+            KV('Model Year', '${cat.modelYear}'),
+            KV('Odometer', fmtKm(m.currentOdometer)),
           ]),
         ),
       ],

@@ -13,12 +13,12 @@ import 'mechanic_shell.dart';
 
 Route<void> _r(Widget w) => MaterialPageRoute(builder: (_) => w);
 
-/// Component names used in a list of records, counted ("By Service Type").
-List<(String, int)> _byType(AppState app, List<MaintenanceRecord> records) {
+/// Number of services per component name.
+List<(String, int)> _byType(AppState app, List<ServiceRecord> records) {
   final counts = <String, int>{};
   for (final r in records) {
     final m = app.motorcycleById(r.motorcycleId);
-    for (final k in r.items.keys) {
+    for (final k in r.componentKeys) {
       final name = m == null ? k : (app.rulesFor(m).where((x) => x.componentKey == k).firstOrNull?.componentName ?? k);
       counts[name] = (counts[name] ?? 0) + 1;
     }
@@ -44,19 +44,19 @@ Widget _breakdown(List<(String, int)> rows) {
   );
 }
 
-Widget _serviceRow(BuildContext context, AppState app, MaintenanceRecord r, {bool time = false}) {
+Widget _serviceRow(BuildContext context, AppState app, ServiceRecord r, {bool time = false}) {
   final m = app.motorcycleById(r.motorcycleId);
   if (m == null) return const SizedBox.shrink();
   return MechRow(
     icon: 'check',
     title: app.catalogOf(m).name,
-    subtitle: '${m.plate} · ${r.description.isEmpty ? 'Service' : r.description}',
-    extra: time ? 'Completed at ${fmtTime(r.createdAt ?? r.date)}' : fmtDate(r.date),
-    onTap: () => Navigator.of(context).push(_r(MechHistoryScreen(motorcycleId: m.id))),
+    subtitle: '${m.plateNumber} · ${r.description.isEmpty ? 'Service' : r.description}',
+    extra: time ? 'Completed at ${fmtTime(r.createdAt ?? r.serviceDate)}' : fmtDate(r.serviceDate),
+    onTap: () => Navigator.of(context).push(_r(MechHistoryScreen(motorcycleId: m.motorcycleId))),
   );
 }
 
-// ====================================================================== 14 Notifications
+// ====================================================================== Notifications
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
@@ -65,15 +65,15 @@ class NotificationsScreen extends StatelessWidget {
     final app = AppScope.of(context);
     final items = <(String icon, String title, String body, DateTime at, bool unread, VoidCallback onTap)>[
       for (final (m, s) in app.overdueFlags)
-        ('alert', '${s.rule.componentName} overdue', '${m.plate} needs a ${s.rule.componentName.toLowerCase()} service.',
-            m.odometerUpdatedAt, true, () => Navigator.of(context).push(_r(MotorcycleInfoScreen(motorcycleId: m.id)))),
+        ('alert', '${s.rule.componentName} overdue', '${m.plateNumber} needs a ${s.rule.componentName.toLowerCase()} service.',
+            m.odometerUpdatedAt, true, () => Navigator.of(context).push(_r(MotorcycleInfoScreen(motorcycleId: m.motorcycleId)))),
       for (final j in app.todaysJobs.where((j) => j.status == JobStatus.waiting))
         if (app.motorcycleById(j.motorcycleId) case final m?)
-          ('wrench', 'New job assigned', '${app.catalogOf(m).name} · ${m.plate} · ${j.note}', j.createdAt, true,
-              () => Navigator.of(context).push(_r(MotorcycleInfoScreen(motorcycleId: m.id)))),
+          ('wrench', 'New job assigned', '${app.catalogOf(m).name} · ${m.plateNumber} · ${j.note}', j.createdAt, true,
+              () => Navigator.of(context).push(_r(MotorcycleInfoScreen(motorcycleId: m.motorcycleId)))),
       for (final r in app.myServices.where((r) => r.receipt != null).take(3))
         if (app.motorcycleById(r.motorcycleId) case final m?)
-          ('receipt', 'Receipt uploaded', 'Receipt attached to ${m.plate} service.', r.createdAt ?? r.date, false,
+          ('receipt', 'Receipt uploaded', 'Receipt attached to ${m.plateNumber} service.', r.createdAt ?? r.serviceDate, false,
               () => Navigator.of(context).push(_r(ReceiptDetailScreen(record: r)))),
       for (final rv in app.reviews.take(2))
         ('star', 'New review', '${rv.ownerName} rated your service ${rv.rating}/5.', rv.createdAt, false,
@@ -105,7 +105,7 @@ class NotificationsScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 16 Logged Out
+// ====================================================================== Logged Out
 class LoggedOutScreen extends StatelessWidget {
   const LoggedOutScreen({super.key, required this.name, required this.email});
 
@@ -129,7 +129,7 @@ class LoggedOutScreen extends StatelessWidget {
               child: const AppIcon('wrench', color: Colors.white, size: 28),
             ),
           ),
-          Text('Motorcycle Care', textAlign: TextAlign.center, style: mt(24, mXBold, MC.accentText)),
+          Text('MotorcycleCare', textAlign: TextAlign.center, style: mt(24, mXBold, MC.accentText)),
           Text("You've been logged out", textAlign: TextAlign.center, style: mt(18, mXBold)),
           Text('See you next time, $name. Your service records are safely saved.',
               textAlign: TextAlign.center, style: mt(13, mMedium, MC.muted, 1.45)),
@@ -137,7 +137,7 @@ class LoggedOutScreen extends StatelessWidget {
       );
 }
 
-// ====================================================================== 17 Done Today
+// ====================================================================== Done Today
 class DoneTodayScreen extends StatelessWidget {
   const DoneTodayScreen({super.key});
 
@@ -164,7 +164,7 @@ class DoneTodayScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 18 This Week
+// ====================================================================== This Week
 class ThisWeekScreen extends StatelessWidget {
   const ThisWeekScreen({super.key});
 
@@ -174,7 +174,7 @@ class ThisWeekScreen extends StatelessWidget {
     final week = app.thisWeek;
     final start = app.weekStart;
     final last = app.servicesBetween(start.subtract(const Duration(days: 7)), start).length;
-    final perDay = [for (var i = 0; i < 7; i++) week.where((r) => dateOnly(r.date) == start.add(Duration(days: i))).length];
+    final perDay = [for (var i = 0; i < 7; i++) week.where((r) => dateOnly(r.serviceDate) == start.add(Duration(days: i))).length];
     final top = perDay.fold<int>(1, math.max);
     final change = last == 0 ? null : ((week.length - last) / last * 100).round();
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -226,7 +226,7 @@ class ThisWeekScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 19 Overdue Flags
+// ====================================================================== Overdue Flags
 class OverdueFlagsScreen extends StatelessWidget {
   const OverdueFlagsScreen({super.key});
 
@@ -256,19 +256,19 @@ class OverdueFlagsScreen extends StatelessWidget {
                     Text(motoLine(app, m), style: mt(12, mMedium, MC.muted)),
                   ]),
                 ),
-                StatusChip.health(Health.overdue),
+                StatusChip.status(MaintenanceStatus.overdue),
               ]),
-              ProgressBar(1, color: MC.danger),
+              const ProgressBar(1, color: MC.danger),
               Text(
-                s.kmLeft(m.odometer) < 0
-                    ? 'Overdue by ${fmtKm(-s.kmLeft(m.odometer))}'
+                s.kmLeft(m.currentOdometer) < 0
+                    ? 'Overdue by ${fmtKm(-s.kmLeft(m.currentOdometer))}'
                     : 'Time limit passed on ${fmtDate(s.nextDate)}',
                 style: mt(12, mBold, MC.danger),
               ),
               MechButton('Inspect Now', height: 44, kind: MechButtonKind.soft, onTap: () async {
                 await app.startJob(m, s.rule.componentName);
                 if (context.mounted) {
-                  Navigator.of(context).push(_r(InspectScreen(motorcycleId: m.id, preselect: s.rule.componentKey)));
+                  Navigator.of(context).push(_r(InspectScreen(motorcycleId: m.motorcycleId, preselect: s.rule.componentKey)));
                 }
               }),
             ]),
@@ -278,7 +278,7 @@ class OverdueFlagsScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 20 Services Completed
+// ====================================================================== Services Completed
 class ServicesCompletedScreen extends StatelessWidget {
   const ServicesCompletedScreen({super.key});
 
@@ -304,7 +304,7 @@ class ServicesCompletedScreen extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
             Text('Total services', style: mt(13, mMedium, MC.heroText)),
             Text('${all.length}', style: mt(40, mXBold, Colors.white, 1.15)),
-            Text('Since you joined ${app.currentUser?.workshopName ?? 'MotorcycleCare'}', style: mt(12, mSemi, MC.heroText)),
+            Text('Since you joined ${app.currentMechanic?.workshopName ?? 'MotorcycleCare'}', style: mt(12, mSemi, MC.heroText)),
           ]),
         ),
         Text('By Month', style: mt(16, mXBold)),
@@ -314,7 +314,7 @@ class ServicesCompletedScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 21 This Month
+// ====================================================================== This Month
 class ThisMonthScreen extends StatelessWidget {
   const ThisMonthScreen({super.key});
 
@@ -358,7 +358,7 @@ class ThisMonthScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 22 Rating & Reviews
+// ====================================================================== Rating & Reviews
 class ReviewsScreen extends StatelessWidget {
   const ReviewsScreen({super.key});
 
@@ -422,7 +422,7 @@ class ReviewsScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 23 Personal Information
+// ====================================================================== Personal Information
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -435,9 +435,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   late final _name = TextEditingController(text: me.fullName);
   late final _phone = TextEditingController(text: me.phone ?? '');
   late final _email = TextEditingController(text: me.email);
-  late final _workshop = TextEditingController(text: me.workshopName ?? '');
+  late final _workshop = TextEditingController(text: switch (me) { Mechanic(:final workshopName) => workshopName ?? '', _ => '' });
   late final _id = TextEditingController(
-      text: 'MC-${me.id.replaceAll(RegExp(r'[^0-9]'), '').padLeft(4, '0').substring(0, 4)}');
+      text: 'MC-${me.userId.replaceAll(RegExp(r'[^0-9]'), '').padLeft(4, '0').substring(0, 4)}');
   bool _busy = false;
   String? _error;
 
@@ -484,7 +484,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       );
 }
 
-// ====================================================================== 24 Workshop
+// ====================================================================== Workshop
 class WorkshopScreen extends StatelessWidget {
   const WorkshopScreen({super.key});
 
@@ -511,7 +511,7 @@ class WorkshopScreen extends StatelessWidget {
               decoration: BoxDecoration(gradient: MC.gradient, borderRadius: BorderRadius.circular(20)),
               child: const AppIcon('store', color: Colors.white, size: 30),
             ),
-            Text(me.workshopName ?? 'No workshop', style: mt(20, mXBold)),
+            Text(app.currentMechanic?.workshopName ?? 'No workshop', style: mt(20, mXBold)),
             if (w != null)
               open
                   ? StatusChip.ok('Open now · until ${w.closesAt}')
@@ -526,7 +526,7 @@ class WorkshopScreen extends StatelessWidget {
             KV('City', w?.city ?? 'Not set'),
             KV('Opening hours', w?.hours ?? 'Not set'),
             KV('Phone', w?.phone ?? 'Not set'),
-            KV('Your role', 'Mechanic'),
+            const KV('Your role', 'Mechanic'),
           ]),
         ),
         if (w == null) const InfoBanner('Workshop details are not registered yet. Ask the admin to add them.', icon: 'info'),
@@ -535,7 +535,7 @@ class WorkshopScreen extends StatelessWidget {
   }
 }
 
-// ====================================================================== 25 Help & Support
+// ====================================================================== Help & Support
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
 
@@ -543,11 +543,12 @@ class HelpScreen extends StatelessWidget {
     ('How do I record a service?',
         'Search the motorcycle by plate number, inspect the components, then fill in the service details and save.'),
     ('Is the receipt required?',
-        'No. Attaching a receipt is optional. You can upload JPG or PNG photos up to 5 MB, or skip this step.'),
+        'No. Attaching a receipt is optional. You can upload JPG, PNG, WEBP or HEIC photos up to 5 MB, or skip this step.'),
     ('What if I entered the wrong data?',
         'Open Edit Details on the review screen, correct the highlighted fields and save again before submitting.'),
     ('Does the owner get notified?',
-        'Yes. When you turn on Notify owner, the owner is updated as soon as the record is saved.'),
+        "Yes. With Notify owner on, the owner's maintenance reminders are recalculated as soon as the record is saved. "
+            "They show up as new reminders in the owner's app."),
   ];
 
   @override
@@ -563,10 +564,10 @@ class HelpScreen extends StatelessWidget {
                 Text(a, style: mt(12, mMedium, MC.muted, 1.45)),
               ]),
             ),
-          MechCard(
+          const MechCard(
             radius: 20,
-            padding: const EdgeInsets.all(16),
-            child: const Column(spacing: 12, children: [
+            padding: EdgeInsets.all(16),
+            child: Column(spacing: 12, children: [
               KV('Email', 'support@motorcyclecare.app'),
               KV('Phone', '+62 21 5000 1234'),
               KV('Support hours', 'Mon–Fri · 08:00–18:00'),

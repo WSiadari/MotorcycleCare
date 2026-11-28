@@ -6,6 +6,7 @@ import 'config.dart';
 import 'data/backend.dart';
 import 'data/mock_backend.dart';
 import 'data/supabase_backend.dart';
+import 'services/local_reminder_notifier.dart';
 import 'state/app_state.dart';
 
 Future<void> main() async {
@@ -13,11 +14,11 @@ Future<void> main() async {
 
   final Backend backend;
   if (AppConfig.useSupabase) {
-    await Supabase.initialize(url: AppConfig.supabaseUrl, anonKey: AppConfig.supabaseKey);
+    await Supabase.initialize(url: AppConfig.supabaseUrl, publishableKey: AppConfig.supabaseKey);
     backend = SupabaseBackend();
   } else {
     backend = MockBackend(); // demo data, no setup needed
   }
 
-  runApp(MotorcycleCareApp(state: AppState(backend)));
+  runApp(MotorcycleCareApp(state: AppState(backend, notifier: LocalReminderNotifier())));
 }

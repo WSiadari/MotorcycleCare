@@ -8,7 +8,7 @@ import '../../widgets/common.dart';
 import 'component_status_screen.dart';
 import 'sheets.dart';
 
-/// 03 · Maintenance History (History Feed with component filters)
+/// Maintenance history with component filters.
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key, this.filter});
 
@@ -33,12 +33,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (moto == null) return const Scaffold(body: SizedBox.shrink());
     final rules = app.rulesFor(moto);
     final names = {for (final r in rules) r.componentKey: r.componentName};
-    final records = app.recordsFor(moto).where((r) => _filter == null || r.items.containsKey(_filter)).toList();
+    final records = app.recordsFor(moto).where((r) => _filter == null || r.covers(_filter!)).toList();
     final n = records.length;
 
     return AppPage(children: [
       const TopBar('Maintenance History'),
-      VehicleChip(vehicleLine(app, moto)),
+      MotorcycleChip(motorcycleLine(app, moto)),
       Wrap(spacing: 8, runSpacing: 8, children: [
         _Chip('All', on: _filter == null, onTap: () => setState(() => _filter = null)),
         for (final r in rules)
@@ -55,8 +55,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Text(
             _filter == null
                 ? 'No service recorded yet. Record a service from any component detail.'
-                : 'No service recorded for ${names[_filter]} yet. Its status is counted from the odometer at '
-                    'registration (${fmtKm(moto.registrationOdometer)}, ${fmtDate(moto.registeredAt)}).',
+                : 'No service recorded for ${names[_filter]} yet. Its status is counted from the first odometer '
+                    'reading (${fmtKm(app.firstReadingOf(moto).valueKm)}, ${fmtDate(app.firstReadingOf(moto).recordedAt)}).',
             style: ts(13, regular, AppColors.muted, 1.4),
           ),
         ),
@@ -64,24 +64,49 @@ class _HistoryScreenState extends State<HistoryScreen> {
         CardBox(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
             Row(children: [
-              Expanded(child: Text(fmtDate(r.date), style: ts(14, semiBold))),
-              Text(fmtKm(r.odometer), style: ts(13, medium, AppColors.muted)),
+              Expanded(child: Text(fmtDate(r.serviceDate), style: ts(14, semiBold))),
+              Text(fmtKm(r.odometerKm), style: ts(13, medium, AppColors.muted)),
             ]),
             Row(spacing: 6, children: [
               AppIcon(r.byMechanic ? 'wrench' : 'user', color: AppColors.muted, size: 14),
               Expanded(
-                child: Text(r.byMechanic ? 'Logged by mechanic · ${r.workshop}' : 'Logged by you',
+                child: Text('Logged by ${recordedByText(r, app.currentUser?.userId).replaceFirst('You', 'you')}',
                     style: ts(12, regular, AppColors.muted)),
               ),
             ]),
             Wrap(spacing: 6, runSpacing: 6, children: [
-              for (final k in r.items.keys)
+              for (final k in r.componentKeys)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(8)),
                   child: Text(names[k] ?? k, style: ts(12, medium, AppColors.accentStrong)),
                 ),
             ]),
+            if (app.canRate(r))
+              Builder(builder: (_) {
+                final mine = app.myReviewOf(r.mechanicId!);
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: mine != null
+                      ? null
+                      : () async {
+                          final ok = await showRateMechanic(context, r);
+                          if (ok && context.mounted) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(const SnackBar(content: Text('Thanks! Your review was sent to the mechanic.')));
+                          }
+                        },
+                  child: Row(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
+                    AppIcon('star', color: mine != null ? AppColors.warn : AppColors.accent, size: 14),
+                    Flexible(
+                      child: Text(
+                          mine != null ? 'You rated ${r.recordedByName ?? 'this mechanic'} ${mine.rating}/5' : 'Rate mechanic',
+                          overflow: TextOverflow.ellipsis,
+                          style: ts(12, semiBold, mine != null ? AppColors.warnText : AppColors.accentStrong)),
+                    ),
+                  ]),
+                );
+              }),
             if (r.receipt != null)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,

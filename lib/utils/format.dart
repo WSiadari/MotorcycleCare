@@ -1,4 +1,4 @@
-/// Small formatting helpers (no extra packages needed).
+/// Formatting helpers.
 String fmtNum(num value) {
   final n = value.round();
   final s = n.abs().toString();

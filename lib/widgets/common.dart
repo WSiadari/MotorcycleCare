@@ -15,34 +15,34 @@ TextStyle ts(double size, FontWeight weight, [Color color = AppColors.text, doub
     TextStyle(fontSize: size, fontWeight: weight, color: color, height: height);
 
 // ------------------------------------------------------------------ status
-class HealthStyle {
-  const HealthStyle(this.label, this.soft, this.text, this.bar, this.dot, this.iconBg, this.icon);
+class StatusStyle {
+  const StatusStyle(this.label, this.soft, this.text, this.bar, this.dot, this.iconBg, this.icon);
 
   final String label;
   final Color soft, text, bar, dot, iconBg, icon;
 
-  static HealthStyle of(Health h) => switch (h) {
-        Health.overdue => const HealthStyle('Overdue', AppColors.dangerSoft, AppColors.danger, AppColors.danger,
+  static StatusStyle of(MaintenanceStatus status) => switch (status) {
+        MaintenanceStatus.overdue => const StatusStyle('Overdue', AppColors.dangerSoft, AppColors.danger, AppColors.danger,
             AppColors.danger, AppColors.dangerSoft, AppColors.dangerIcon),
-        Health.dueSoon => const HealthStyle('Due soon', AppColors.warnSoft, AppColors.warnText, AppColors.warn,
+        MaintenanceStatus.dueSoon => const StatusStyle('Due soon', AppColors.warnSoft, AppColors.warnText, AppColors.warn,
             AppColors.warn, AppColors.warnSoft, AppColors.warnText),
-        Health.onTrack => const HealthStyle('On track', AppColors.successSoft, AppColors.successText,
+        MaintenanceStatus.onTrack => const StatusStyle('On track', AppColors.successSoft, AppColors.successText,
             AppColors.success, AppColors.success, AppColors.accentSoft, AppColors.accent),
       };
 
-  /// Colour of a "% used" label (on-track uses the green text colour).
+  /// Color of a "% used" label (on track uses the green text color).
   Color get percent => text;
 }
 
-/// "Badge / Overdue · Due soon · On track"
+/// Status badge: Overdue, Due soon or On track.
 class StatusBadge extends StatelessWidget {
-  const StatusBadge(this.health, {super.key});
+  const StatusBadge(this.status, {super.key});
 
-  final Health health;
+  final MaintenanceStatus status;
 
   @override
   Widget build(BuildContext context) {
-    final s = HealthStyle.of(health);
+    final s = StatusStyle.of(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(color: s.soft, borderRadius: BorderRadius.circular(999)),
@@ -52,6 +52,16 @@ class StatusBadge extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// Who logged a service record, as shown in the owner's history:
+/// "Mechanic · Budi Santoso · Maju Jaya Motor", "You · at AHASS Sudirman", "You · self-service".
+String recordedByText(ServiceRecord r, String? myUserId) {
+  if (r.byMechanic) {
+    return {'Mechanic', r.recordedByName ?? 'Mechanic', if (r.atWorkshop) r.workshopName!}.join(' · ');
+  }
+  final who = r.recordedByUserId == myUserId ? 'You' : (r.recordedByName ?? 'Owner');
+  return r.atWorkshop ? '$who · at ${r.workshopName}' : '$who · self-service';
 }
 
 // ------------------------------------------------------------------ boxes
@@ -80,7 +90,7 @@ class IconBox extends StatelessWidget {
       );
 }
 
-/// White card with the light border used everywhere in the design.
+/// White card with a light border.
 class CardBox extends StatelessWidget {
   const CardBox({
     super.key,
@@ -114,7 +124,7 @@ class CardBox extends StatelessWidget {
   }
 }
 
-/// Coloured note with an icon (Info Note, banners).
+/// Colored note with an icon.
 class Note extends StatelessWidget {
   const Note(
     this.text, {
@@ -290,7 +300,7 @@ class SquareButton extends StatelessWidget {
   }
 }
 
-/// "Top Bar": back button, title, optional actions.
+/// Top bar: back button, title and optional actions.
 class TopBar extends StatelessWidget {
   const TopBar(this.title, {super.key, this.back = true, this.onBack, this.actions = const []});
 
@@ -311,9 +321,9 @@ class TopBar extends StatelessWidget {
   }
 }
 
-/// "Vehicle Info" / "Vehicle Chip": Honda Vario 160 · B 4521 KXR · 8,450 km
-class VehicleChip extends StatelessWidget {
-  const VehicleChip(this.text, {super.key, this.onTap});
+/// Motorcycle chip: Honda Vario 160 · B 4521 KXR · 8,450 km
+class MotorcycleChip extends StatelessWidget {
+  const MotorcycleChip(this.text, {super.key, this.onTap});
 
   final String text;
   final VoidCallback? onTap;
@@ -407,7 +417,7 @@ class ErrorLine extends StatelessWidget {
       ]);
 }
 
-/// Text input styled like "Input / …" in the design (white, 1.5 px border, radius 12).
+/// Text input (white, 1.5 px border, radius 12).
 class AppInput extends StatelessWidget {
   const AppInput({
     super.key,
@@ -549,7 +559,7 @@ class AppPage extends StatelessWidget {
   }
 }
 
-/// Bottom sheet with the "Sheet Header" (title + close button).
+/// Bottom sheet with a title and close button.
 Future<T?> showAppSheet<T>(BuildContext context,
     {required String title, required List<Widget> Function(BuildContext sheetContext) children, double gap = 12}) {
   return showModalBottomSheet<T>(

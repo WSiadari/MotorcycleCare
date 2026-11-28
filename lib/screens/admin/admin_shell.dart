@@ -8,12 +8,9 @@ import '../../widgets/app_icon.dart';
 import '../../widgets/common.dart';
 import '../auth/welcome_screen.dart';
 import 'admin_forms.dart';
+import 'admin_reports.dart';
 
-// Admin Activity Diagram:
-// Log In → Admin Dashboard → Choose Module (Users · Motorcycle Catalog · Maintenance Rules)
-//   → View → Add / Edit / Delete → Save Changes → Return to Admin Dashboard → Manage Another Module? → Log Out
-
-/// B1–B4 · Admin App with bottom navigation (Home · Users · Catalog · Rules · Profile).
+/// Admin app with bottom navigation (Home · Users · Catalog · Rules · Profile).
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
 
@@ -117,14 +114,14 @@ class _AdminShellState extends State<AdminShell> {
 
 typedef _Go = void Function(int tab, {UserRole? userFilter, String? ruleModelId});
 
-/// Colours of the role badge and avatar.
+/// Colors of the role badge and avatar.
 (Color bg, Color fg) roleColors(UserRole r) => switch (r) {
       UserRole.owner => (AppColors.successSoft, AppColors.successText),
       UserRole.mechanic => (AppColors.warnSoft, AppColors.warnText),
       UserRole.admin => (AppColors.accentSoft, AppColors.accentStrong),
     };
 
-/// "Badge/…"
+/// Small colored badge.
 class Badge2 extends StatelessWidget {
   const Badge2(this.label, {super.key, required this.bg, required this.fg});
 
@@ -137,7 +134,7 @@ class Badge2 extends StatelessWidget {
       ? const Badge2('Active', bg: AppColors.successSoft, fg: AppColors.successText)
       : const Badge2('Inactive', bg: AppColors.neutralSoft, fg: AppColors.muted);
 
-  factory Badge2.type(MotoType t) => Badge2(t.label, bg: AppColors.neutralSoft, fg: AppColors.text);
+  factory Badge2.type(MotorcycleType t) => Badge2(t.label, bg: AppColors.neutralSoft, fg: AppColors.text);
 
   final String label;
   final Color bg, fg;
@@ -284,7 +281,7 @@ void adminSnack(BuildContext context, String text, {String? action, VoidCallback
         action: action == null ? null : SnackBarAction(label: action, textColor: AppColors.accentSoft, onPressed: onAction!),
       ));
 
-// ====================================================================== B1 · Admin Dashboard
+// ====================================================================== Admin Dashboard
 class _HomeTab extends StatelessWidget {
   const _HomeTab({required this.go});
 
@@ -358,7 +355,7 @@ class _HomeTab extends StatelessWidget {
               }),
             ),
         ]),
-        _SectionTitle('Manage modules', '3 modules'),
+        const _SectionTitle('Manage modules', '4 modules'),
         AdminRow(
           icon: 'users',
           title: 'Users',
@@ -377,7 +374,13 @@ class _HomeTab extends StatelessWidget {
           subtitle: '${app.allRules.length} rules · intervals per component',
           onTap: () => go(3),
         ),
-        _SectionTitle('Recent changes', activity.isEmpty ? '' : timeAgo(activity.first.at)),
+        AdminRow(
+          icon: 'chart',
+          title: 'Reports',
+          subtitle: 'Users per role, models per type, rules per model',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReportsScreen())),
+        ),
+        _SectionTitle('Recent changes', activity.isEmpty ? '' : timeAgo(activity.first.createdAt)),
         CardBox(
           radius: 18,
           padding: const EdgeInsets.all(12),
@@ -393,7 +396,7 @@ class _HomeTab extends StatelessWidget {
                           Text(a.subtitle, style: ts(12, regular, AppColors.muted)),
                         ]),
                       ),
-                      Text(timeAgo(a.at), style: ts(12, medium, AppColors.muted)),
+                      Text(timeAgo(a.createdAt), style: ts(12, medium, AppColors.muted)),
                     ]),
                 ]),
         ),
@@ -417,7 +420,7 @@ class _SectionTitle extends StatelessWidget {
       );
 }
 
-/// B2 · Notifications (overlay)
+/// Notifications sheet.
 Future<void> showAdminNotifications(BuildContext context) {
   final app = AppScope.read(context);
   return showAppSheet(context, title: 'Notifications', children: (sheet) {
@@ -432,7 +435,7 @@ Future<void> showAdminNotifications(BuildContext context) {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                 Text(a.title, style: ts(15, semiBold)),
-                Text('${a.subtitle} · ${timeAgo(a.at).toLowerCase()}', style: ts(12, regular, AppColors.muted)),
+                Text('${a.subtitle} · ${timeAgo(a.createdAt).toLowerCase()}', style: ts(12, regular, AppColors.muted)),
               ]),
             ),
           ]),
@@ -441,7 +444,7 @@ Future<void> showAdminNotifications(BuildContext context) {
   });
 }
 
-// ====================================================================== C1 · Manage users
+// ====================================================================== Manage users
 class _UsersTab extends StatefulWidget {
   const _UsersTab({super.key, this.initialFilter, required this.onBack});
 
@@ -509,7 +512,7 @@ class _UsersTabState extends State<_UsersTab> {
   }
 }
 
-// ====================================================================== D1 · Motorcycle catalog
+// ====================================================================== Motorcycle catalog
 class _CatalogTab extends StatefulWidget {
   const _CatalogTab({required this.onBack});
 
@@ -520,7 +523,7 @@ class _CatalogTab extends StatefulWidget {
 }
 
 class _CatalogTabState extends State<_CatalogTab> {
-  MotoType? _filter;
+  MotorcycleType? _filter;
   final _q = TextEditingController();
 
   @override
@@ -535,7 +538,7 @@ class _CatalogTabState extends State<_CatalogTab> {
     final all = app.catalog;
     final q = _q.text.trim().toLowerCase();
     final list = all
-        .where((c) => _filter == null || c.type == _filter)
+        .where((c) => _filter == null || c.motorcycleType == _filter)
         .where((c) => q.isEmpty || c.name.toLowerCase().contains(q))
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
@@ -552,8 +555,8 @@ class _CatalogTabState extends State<_CatalogTab> {
           scrollDirection: Axis.horizontal,
           child: Row(spacing: 8, children: [
             FilterChip2('All ${all.length}', on: _filter == null, onTap: () => setState(() => _filter = null)),
-            for (final t in MotoType.values)
-              FilterChip2('${t.label} ${all.where((c) => c.type == t).length}',
+            for (final t in MotorcycleType.values)
+              FilterChip2('${t.label} ${all.where((c) => c.motorcycleType == t).length}',
                   on: _filter == t, onTap: () => setState(() => _filter = t)),
           ]),
         ),
@@ -564,8 +567,8 @@ class _CatalogTabState extends State<_CatalogTab> {
           AdminRow(
             icon: 'bike',
             title: c.name,
-            subtitle: '${c.year} · ${app.rulesForCatalog(c.id).length} maintenance rules',
-            trailing: Badge2.type(c.type),
+            subtitle: '${c.modelYear} · ${app.rulesForCatalog(c.catalogId).length} maintenance rules',
+            trailing: Badge2.type(c.motorcycleType),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ModelFormScreen(model: c))),
           ),
       ],
@@ -573,7 +576,7 @@ class _CatalogTabState extends State<_CatalogTab> {
   }
 }
 
-// ====================================================================== E1 · Maintenance rules
+// ====================================================================== Maintenance rules
 class _RulesTab extends StatelessWidget {
   const _RulesTab({required this.modelId, required this.onModel, required this.onBack});
 
@@ -585,23 +588,23 @@ class _RulesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final catalog = app.catalog;
-    final model = catalog.where((c) => c.id == modelId).firstOrNull ?? catalog.firstOrNull;
+    final model = catalog.where((c) => c.catalogId == modelId).firstOrNull ?? catalog.firstOrNull;
     if (model == null) {
       return AppPage(children: [
         ModuleHeader('Maintenance rules', onBack: onBack),
         CardBox(child: Text('Add a motorcycle model to the catalog first.', style: ts(13, regular, AppColors.muted))),
       ]);
     }
-    final rules = app.rulesForCatalog(model.id);
+    final rules = app.rulesForCatalog(model.catalogId);
     Future<void> choose() async {
       final id = await showAppSheet<String>(context, title: 'Choose a model', children: (sheet) => [
             for (final c in catalog)
               AdminRow(
                 icon: 'bike',
                 title: c.name,
-                subtitle: '${c.type.label} · ${c.year} · ${app.rulesForCatalog(c.id).length} rules',
-                trailing: c.id == model.id ? const AppIcon('check', color: AppColors.accentStrong, size: 18) : null,
-                onTap: () => Navigator.of(sheet).pop(c.id),
+                subtitle: '${c.motorcycleType.label} · ${c.modelYear} · ${app.rulesForCatalog(c.catalogId).length} rules',
+                trailing: c.catalogId == model.catalogId ? const AppIcon('check', color: AppColors.accentStrong, size: 18) : null,
+                onTap: () => Navigator.of(sheet).pop(c.catalogId),
               ),
           ]);
       if (id != null) onModel(id);
@@ -626,7 +629,7 @@ class _RulesTab extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                 Text('Motorcycle model', style: ts(12, medium, AppColors.muted)),
                 Text(model.name, style: ts(16, bold)),
-                Text('${model.type.label} · ${model.year}', style: ts(12, regular, AppColors.muted)),
+                Text('${model.motorcycleType.label} · ${model.modelYear}', style: ts(12, regular, AppColors.muted)),
               ]),
             ),
             Row(mainAxisSize: MainAxisSize.min, spacing: 4, children: [
@@ -653,7 +656,7 @@ class _RulesTab extends StatelessWidget {
   }
 }
 
-// ====================================================================== B3 · Admin Profile
+// ====================================================================== Admin Profile
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab({required this.go});
 
@@ -714,10 +717,13 @@ class _ProfileTab extends StatelessWidget {
               ('users', 'Manage users', 'Add, edit or remove accounts', 1),
               ('book', 'Motorcycle catalog', 'Types, makes, models and years', 2),
               ('sliders', 'Maintenance rules', 'Service intervals per component', 3),
+              ('chart', 'System report', 'Counts per role, type and model · CSV', -1),
             ])
               InkWell(
                 borderRadius: BorderRadius.circular(12),
-                onTap: () => go(tab),
+                onTap: () => tab < 0
+                    ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReportsScreen()))
+                    : go(tab),
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: Row(spacing: 12, children: [
@@ -740,7 +746,7 @@ class _ProfileTab extends StatelessWidget {
   }
 }
 
-/// B4 · Log Out (overlay)
+/// Log out confirmation.
 Future<void> _logOut(BuildContext context) => showAppSheet(context, title: 'Log out?', gap: 14, children: (sheet) => [
       Text('You will need to log in again to manage users, the catalog and maintenance rules.',
           style: ts(14, regular, AppColors.muted, 1.45)),

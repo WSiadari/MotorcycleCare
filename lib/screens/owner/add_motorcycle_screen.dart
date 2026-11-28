@@ -9,7 +9,7 @@ import '../../widgets/app_icon.dart';
 import '../../widgets/common.dart';
 import 'dashboard_screen.dart';
 
-/// B2 · Add Motorcycle → Motorcycle valid? → Save Motorcycle → Motorcycle Dashboard
+/// Adds a motorcycle and opens its dashboard.
 class AddMotorcycleScreen extends StatefulWidget {
   const AddMotorcycleScreen({super.key});
 
@@ -47,10 +47,10 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
       _plateError = AppState.validatePlate(_plate.text);
       _odoError = odo == null ? 'Enter the odometer reading in km.' : (odo > 500000 ? 'That number looks too high.' : null);
     });
-    if (_modelError != null || _plateError != null || _odoError != null) return; // Show motorcycle error
+    if (_modelError != null || _plateError != null || _odoError != null) return;
     setState(() => _busy = true);
     final app = AppScope.read(context);
-    final err = await app.addMotorcycle(catalogId: _catalogId!, plate: _plate.text, odometer: odo!);
+    final err = await app.addMotorcycle(catalogId: _catalogId!, plateNumber: _plate.text, odometerKm: odo!);
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
@@ -77,7 +77,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final catalog = app.catalog;
-    final selected = catalog.where((c) => c.id == _catalogId).firstOrNull;
+    final selected = catalog.where((c) => c.catalogId == _catalogId).firstOrNull;
 
     if (_saved != null) {
       final m = _saved!;
@@ -93,8 +93,8 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
             const IconBox('check', size: 48, radius: 24, iconSize: 24, bg: AppColors.successSoft, color: AppColors.successIcon),
             Text('${cat.name} saved', style: ts(18, bold)),
             Text(
-              'Plate ${m.plate} · ${fmtKm(m.odometer)}. Its maintenance schedule was created from the Admin rules '
-              'for the ${cat.model} (${cat.type.label}).',
+              'Plate ${m.plateNumber} · ${fmtKm(m.currentOdometer)}. Its maintenance schedule was created from the Admin rules '
+              'for the ${cat.model} (${cat.motorcycleType.label}).',
               style: ts(13, regular, AppColors.muted, 1.45),
             ),
           ]),
@@ -108,7 +108,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
       const TopBar('Add Motorcycle'),
       Text('Register a motorcycle to start tracking its maintenance.', style: ts(14, regular, AppColors.muted, 1.43)),
       if (_error != null) ErrorBanner(_error!),
-      // Field / Motorcycle (from catalog)
+      // Motorcycle model (from the catalog)
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
         const FieldLabel('Motorcycle (from catalog)'),
         InputBox(
@@ -126,7 +126,7 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
                     )
                   : Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                       Text(selected.name, style: ts(15, semiBold)),
-                      Text('${selected.type.label} · ${selected.year}', style: ts(12, regular, AppColors.muted)),
+                      Text('${selected.motorcycleType.label} · ${selected.modelYear}', style: ts(12, regular, AppColors.muted)),
                     ]),
             ),
             AppIcon(_pickerOpen ? 'chevU' : 'chevD', color: AppColors.muted, size: 16),
@@ -143,12 +143,12 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
             child: Column(spacing: 2, children: [
               for (final c in catalog)
                 Material(
-                  color: c.id == _catalogId ? AppColors.accentSoft : Colors.transparent,
+                  color: c.catalogId == _catalogId ? AppColors.accentSoft : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(10),
                     onTap: () => setState(() {
-                      _catalogId = c.id;
+                      _catalogId = c.catalogId;
                       _pickerOpen = false;
                       _modelError = null;
                     }),
@@ -158,11 +158,11 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                             Text(c.name,
-                                style: ts(14, semiBold, c.id == _catalogId ? AppColors.accentStrong : AppColors.text)),
-                            Text('${c.type.label} · ${c.year}', style: ts(12, regular, AppColors.muted)),
+                                style: ts(14, semiBold, c.catalogId == _catalogId ? AppColors.accentStrong : AppColors.text)),
+                            Text('${c.motorcycleType.label} · ${c.modelYear}', style: ts(12, regular, AppColors.muted)),
                           ]),
                         ),
-                        if (c.id == _catalogId) const AppIcon('check', color: AppColors.accent, size: 16),
+                        if (c.catalogId == _catalogId) const AppIcon('check', color: AppColors.accent, size: 16),
                       ]),
                     ),
                   ),
@@ -180,10 +180,10 @@ class _AddMotorcycleScreenState extends State<AddMotorcycleScreen> {
         CardBox(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
             Text('Filled from catalog', style: ts(12, semiBold, AppColors.muted)),
-            InfoRow('Type', selected.type.label),
+            InfoRow('Type', selected.motorcycleType.label),
             InfoRow('Make', selected.make),
             InfoRow('Model', selected.model),
-            InfoRow('Year', '${selected.year}'),
+            InfoRow('Year', '${selected.modelYear}'),
           ]),
         ),
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [

@@ -6,7 +6,7 @@ import '../../widgets/common.dart';
 import '../home_router.dart';
 import 'register_screen.dart';
 
-/// A2 · Log In  /  A2b · Log In – After Register
+/// Login screen, also shown right after registration.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.prefillEmail, this.justRegistered = false, this.needsConfirmation = false});
 
@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      setState(() => _error = err); // Login successful? → No → Show login error
+      setState(() => _error = err);
       return;
     }
     final user = AppScope.read(context).currentUser!;

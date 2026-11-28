@@ -6,7 +6,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common.dart';
 import 'login_screen.dart';
 
-/// A3 · Create Account → Registration valid? → Create User Account → A2b · Log In
+/// Registration screen. Opens the login screen when the account is created.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -53,7 +53,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       };
     });
     if ([_nameError, _emailError, _passwordError, _confirmError, _extraError].any((e) => e != null)) {
-      return; // Registration valid? → No → Show registration error
+      return;
     }
     setState(() => _busy = true);
     final (err, needsConfirmation) = await AppScope.read(context).register(
@@ -70,7 +70,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         if (err.contains('already exists') || err.contains('already registered')) {
           _emailError = 'This email is already registered. Log in or use another email.';
-        } else if (err.contains('Staff code')) {
+        } else if (err.contains('Staff code') || err.contains('workshop')) {
           _extraError = err;
         } else {
           _error = err;
@@ -100,7 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       const TopBar('Create Account'),
       Text('One account for all your motorcycles.', style: ts(14, regular, AppColors.muted)),
       if (_error != null) ErrorBanner(_error!),
-      // Use case diagram actors: Users/Driver, Mechanic, Admin
+      // Role
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
         const FieldLabel('I am a'),
         Container(

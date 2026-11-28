@@ -9,7 +9,7 @@ import '../../widgets/common.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 
-/// A1 · Welcome — Open MotorcycleCare → "Already have an account?"
+/// Welcome screen with Log In and Create Account.
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -20,7 +20,7 @@ class WelcomeScreen extends StatelessWidget {
       backgroundColor: AppColors.bg,
       body: SingleChildScrollView(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // Hero (390 × 440 in the design, incl. status bar) + the status card that overlaps its bottom edge.
+          // Hero (390 × 440 incl. status bar) and the status card overlapping its bottom edge.
           SizedBox(
             height: 412 + topInset,
             child: Stack(clipBehavior: Clip.none, children: [
@@ -90,7 +90,7 @@ class _HeroBackground extends StatelessWidget {
   }
 }
 
-/// Wordmark, gauge, odometer drum, reminder pill and status card (positions from the Figma frame).
+/// Wordmark, gauge, odometer drum, reminder pill and status card.
 class _HeroArt extends StatelessWidget {
   const _HeroArt();
 
@@ -167,7 +167,7 @@ class _HeroArt extends StatelessWidget {
                   Text('Was due at 8,200 km', style: ts(11, regular, AppColors.muted)),
                 ]),
               ),
-              const StatusBadge(Health.overdue),
+              const StatusBadge(MaintenanceStatus.overdue),
             ]),
           ),
         ),
@@ -207,7 +207,7 @@ class _GaugePainter extends CustomPainter {
     }
 
     // needle at 88 %
-    final na = math.pi + math.pi * 0.88;
+    const na = math.pi + math.pi * 0.88;
     canvas.drawLine(c, c + Offset(math.cos(na) * 84, math.sin(na) * 84), stroke(Colors.white, 4));
     canvas.drawCircle(c, 11, Paint()..color = Colors.white);
     canvas.drawCircle(c, 4, Paint()..color = AppColors.accentStrong);

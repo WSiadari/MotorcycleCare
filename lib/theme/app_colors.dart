@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Colour tokens from the "MotorcycleCare Tokens" collection in the Figma file.
+/// App theme colors.
 class AppColors {
   AppColors._();
 
@@ -29,7 +29,7 @@ class AppColors {
   static const successSoft = Color(0xFFE2F5E5);
   static const successIcon = Color(0xFF3E9F4E);
 
-  // Admin App tokens ("MotorcycleCare Admin Tokens")
+  // Admin app colors
   static const neutralSoft = Color(0xFFF1ECE7);
   static const accentDeep = Color(0xFFC9561F);
 }

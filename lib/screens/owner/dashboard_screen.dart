@@ -9,14 +9,16 @@ import '../../widgets/common.dart';
 import 'component_detail_screen.dart';
 import 'component_status_screen.dart';
 import 'history_screen.dart';
+import 'odometer_history_screen.dart';
+import 'profile_screen.dart';
 import 'sheets.dart';
 import 'update_odometer_screen.dart';
 
 /// "Was due at 8,200 km" / "Next at 8,700 km or 28 Dec 2026"
 String scheduleLine(ComponentStatus s) =>
-    s.health == Health.overdue ? 'Was due at ${fmtKm(s.nextKm)}' : 'Next at ${fmtKm(s.nextKm)} or ${fmtDate(s.nextDate)}';
+    s.status == MaintenanceStatus.overdue ? 'Was due at ${fmtKm(s.nextKm)}' : 'Next at ${fmtKm(s.nextKm)} or ${fmtDate(s.nextDate)}';
 
-/// C1 · Motorcycle Dashboard
+/// Dashboard of the selected motorcycle.
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
@@ -32,10 +34,9 @@ class DashboardScreen extends StatelessWidget {
     if (moto == null) return const Scaffold(body: SizedBox.shrink());
     final cat = app.catalogOf(moto);
     final statuses = app.statusesFor(moto);
-    final ordered = [...statuses]..sort((a, b) => b.health.index.compareTo(a.health.index));
-    final alerts = app.alertsFor(moto);
-    final overdue = statuses.where((s) => s.health == Health.overdue).toList();
-    final soon = statuses.where((s) => s.health == Health.dueSoon).toList();
+    final ordered = [...statuses]..sort((a, b) => b.status.index.compareTo(a.status.index));
+    final overdue = statuses.where((s) => s.status == MaintenanceStatus.overdue).toList();
+    final soon = statuses.where((s) => s.status == MaintenanceStatus.dueSoon).toList();
     final today = app.servicedToday(moto);
     final records = app.recordsFor(moto).length;
 
@@ -43,8 +44,8 @@ class DashboardScreen extends StatelessWidget {
 
     return AppPage(children: [
       TopBar('My Motorcycle', back: false, actions: [
-        SquareButton('logout', tooltip: 'Log out', onTap: () => showLogOut(context)),
-        SquareButton('bell', tooltip: 'Reminders', badge: alerts.length, onTap: () => showReminders(context)),
+        SquareButton('user', tooltip: 'Profile & settings', onTap: () => push(OwnerProfileScreen.route())),
+        SquareButton('bell', tooltip: 'Reminders', badge: app.unreadReminders(moto), onTap: () => showReminders(context)),
       ]),
       // Motorcycle Card
       CardBox(
@@ -56,7 +57,7 @@ class DashboardScreen extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                 Text(cat.name, style: ts(17, bold)),
-                Text('${moto.plate} · ${cat.year}', style: ts(13, regular, AppColors.muted)),
+                Text('${moto.plateNumber} · ${cat.modelYear}', style: ts(13, regular, AppColors.muted)),
               ]),
             ),
             _PillButton('Switch', onTap: () => Navigator.of(context).maybePop()),
@@ -65,9 +66,12 @@ class DashboardScreen extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                 Text('Odometer · updated ${fmtDate(moto.odometerUpdatedAt)}', style: ts(12, regular, AppColors.muted)),
-                Text(fmtKm(moto.odometer), style: ts(22, bold)),
+                Text(fmtKm(moto.currentOdometer), style: ts(22, bold)),
               ]),
             ),
+            _PillButton('History', icon: 'clock', radius: 12, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                fontSize: 13, onTap: () => push(OdometerHistoryScreen.route())),
+            const SizedBox(width: 8),
             _PillButton('Update', icon: 'pencil', radius: 12, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 fontSize: 13, onTap: () => push(UpdateOdometerScreen.route())),
           ]),
@@ -79,7 +83,7 @@ class DashboardScreen extends StatelessWidget {
         soon: soon,
         servicedToday: [
           for (final s in statuses)
-            if (today.contains(s.rule.componentKey) && s.health == Health.onTrack) s.rule.componentName,
+            if (today.contains(s.rule.componentKey) && s.status == MaintenanceStatus.onTrack) s.rule.componentName,
         ],
         onTap: () => push(ComponentStatusScreen.route()),
       ),
@@ -116,14 +120,14 @@ class DashboardScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(spacing: 12, children: [
                   IconBox(componentIconName(s.rule.componentKey),
-                      size: 32, radius: 9, iconSize: 16, bg: HealthStyle.of(s.health).iconBg, color: HealthStyle.of(s.health).icon),
+                      size: 32, radius: 9, iconSize: 16, bg: StatusStyle.of(s.status).iconBg, color: StatusStyle.of(s.status).icon),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                       Text(s.rule.componentName, style: ts(14, semiBold)),
                       Text(scheduleLine(s), style: ts(12, regular, AppColors.muted)),
                     ]),
                   ),
-                  StatusBadge(s.health),
+                  StatusBadge(s.status),
                 ]),
               ),
             ),

@@ -12,7 +12,7 @@ import '../../widgets/common.dart';
 import 'component_status_screen.dart';
 import 'maintenance_saved_screen.dart';
 
-/// 07a · Record Maintenance → Attach service receipt? (skip / attach) → Save Maintenance Record
+/// Form for a maintenance record logged by the owner, with an optional receipt.
 class RecordMaintenanceScreen extends StatefulWidget {
   const RecordMaintenanceScreen({super.key, this.preselected = const {}});
 
@@ -35,7 +35,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
   late final TextEditingController _desc;
   bool _descEdited = false;
   bool _byMechanic = true;
-  Receipt? _receipt;
+  ServiceReceipt? _receipt;
   bool _busy = false;
   String? _itemsError, _kmError, _workshopError, _fileError, _saveError;
 
@@ -43,7 +43,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
   void initState() {
     super.initState();
     final moto = AppScope.read(context).selected!;
-    _km = TextEditingController(text: '${moto.odometer}');
+    _km = TextEditingController(text: '${moto.currentOdometer}');
     _desc = TextEditingController(text: _autoDescription());
   }
 
@@ -67,7 +67,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _date,
-      firstDate: moto.registeredAt,
+      firstDate: dateOnly(AppScope.read(context).firstReadingOf(moto).recordedAt),
       lastDate: today(),
     );
     if (picked != null) setState(() => _date = picked);
@@ -78,13 +78,14 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
       if (file == null) return;
       final size = await file.length();
-      if (size > 5 * 1024 * 1024) {
-        setState(() => _fileError = 'File is larger than 5 MB. Choose a smaller photo.');
+      final error = ServiceReceipt.validateFile(fileName: file.name, sizeBytes: size);
+      if (error != null) {
+        setState(() => _fileError = error);
         return;
       }
       setState(() {
         _fileError = null;
-        _receipt = Receipt(name: file.name, path: file.path, sizeBytes: size);
+        _receipt = ServiceReceipt(fileName: file.name, localPath: file.path, sizeBytes: size);
       });
     } catch (_) {
       setState(() => _fileError = 'Could not open the gallery. Check the app permission.');
@@ -102,7 +103,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
           ? 'Enter the odometer at the time of service.'
           : km < minKm
               ? 'Must be at least ${fmtKm(minKm)} (${_minReason(rules)}).'
-              : km > moto.odometer + AppState.maxOdometerJump
+              : km > moto.currentOdometer + AppState.maxOdometerJump
                   ? 'That number looks too high.'
                   : null;
       _workshopError = _byMechanic && _workshop.text.trim().isEmpty ? 'Enter the workshop name.' : null;
@@ -120,10 +121,10 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
     setState(() => _busy = true);
     final (record, err) = await app.saveRecord(
       motorcycle: moto,
-      date: _date,
-      odometer: km!,
+      serviceDate: _date,
+      odometerKm: km!,
       items: items,
-      workshop: _byMechanic ? _workshop.text : null,
+      workshopName: _byMechanic ? _workshop.text : null,
       receipt: _receipt,
     );
     if (!mounted) return;
@@ -152,7 +153,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
 
     return AppPage(children: [
       const TopBar('Record Maintenance'),
-      VehicleChip(vehicleLine(app, moto)),
+      MotorcycleChip(motorcycleLine(app, moto)),
       // Components serviced
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
         const FieldLabel('Components serviced'),
@@ -187,10 +188,10 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
           ErrorLine(_kmError!)
         else
           Helper(_items.isEmpty
-              ? 'At least ${fmtKm(minKm)} (odometer at registration).'
+              ? 'At least ${fmtKm(minKm)} (first odometer reading).'
               : 'At least ${fmtKm(minKm)} (${_minReason(rules)}).'),
       ]),
-      // Performed By Field
+      // Performed by
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
         const FieldLabel('Performed by'),
         Container(
@@ -230,7 +231,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
           onChanged: (_) => _descEdited = true,
         ),
       ]),
-      // Receipt Field
+      // Receipt
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
         const FieldLabel('Service receipt (optional)'),
         if (_receipt != null)
@@ -240,7 +241,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
             child: Row(spacing: 10, children: [
               const AppIcon('check', color: AppColors.successIcon, size: 16),
               Expanded(
-                child: Text('${_receipt!.name} · ${(_receipt!.sizeBytes / 1048576).toStringAsFixed(1)} MB',
+                child: Text('${_receipt!.fileName} · ${(_receipt!.sizeBytes / 1048576).toStringAsFixed(1)} MB',
                     overflow: TextOverflow.ellipsis, style: ts(13, semiBold, AppColors.successText)),
               ),
               IconButton(
@@ -263,7 +264,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
                 child: Column(spacing: 4, children: [
                   const AppIcon('upload', color: AppColors.accent, size: 22),
                   Text('Attach receipt', style: ts(14, semiBold, AppColors.accentStrong)),
-                  Text('JPG or PNG photo, up to 5 MB', style: ts(12, regular, AppColors.muted)),
+                  Text('JPG, PNG, WEBP or HEIC photo, up to 5 MB', style: ts(12, regular, AppColors.muted)),
                 ]),
               ),
             ),
@@ -281,7 +282,7 @@ class _RecordMaintenanceScreenState extends State<RecordMaintenanceScreen> {
   }
 }
 
-/// "Select Chip" (State=Off / State=On)
+/// Selectable component chip.
 class _SelectChip extends StatelessWidget {
   const _SelectChip(this.label, {required this.on, required this.onTap});
 

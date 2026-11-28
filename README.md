@@ -1,151 +1,138 @@
-# MotorcycleCare — Owner, Mechanic & Admin App (Flutter)
+# MotorcycleCare
 
-Aplikasi Android untuk pemilik motor: daftar/login, kelola motor, update odometer,
-lihat status komponen, terima pengingat, dan catat servis (dengan nota opsional).
-Alurnya mengikuti **User Activity Diagram** dan use case di file `.drawio` kelompok.
+MotorcycleCare adalah aplikasi Android untuk mencatat dan memantau perawatan motor. Aplikasi ini dipakai oleh
+tiga role: **Motorcycle Owner** memantau jadwal servis tiap komponen berdasarkan odometer dan waktu,
+**Mechanic** mencari motor pelanggan dan mencatat servis, dan **Admin** mengelola akun, katalog motor, serta
+aturan perawatan. Status komponen menjadi *due soon* saat pemakaian mencapai 80 % interval dan *overdue* saat
+mencapai 100 % (km atau bulan, mana yang lebih dulu).
 
-Bisa jalan dengan **data demo** (tanpa setup) atau dengan **Supabase** (lihat bagian 7).
-Aturan servis sama dengan yang ada di app Admin.
+## Fitur
 
-## 1. Yang perlu dipasang
-- Flutter SDK 3.22 atau lebih baru — https://docs.flutter.dev/get-started/install
-- Android Studio (untuk Android SDK + emulator) atau HP Android dengan USB debugging
-- VS Code + extension **Flutter** dan **Dart**
+**Motorcycle Owner**
+- Registrasi dan login
+- Menambah dan memilih motor dari katalog
+- Update dan konfirmasi odometer, beserta riwayat bacaan odometer
+- Jadwal perawatan dan status setiap komponen
+- Pengingat perawatan yang tersimpan, dengan notifikasi lokal
+- Mencatat perawatan beserta foto nota servis (JPG, PNG, WEBP, HEIC, maks. 5 MB)
+- Riwayat perawatan, termasuk nama mekanik yang mencatat
+- Memberi rating kepada mekanik yang pernah menservis motor
+- Profil dan pengaturan notifikasi
 
-Cek dengan: `flutter doctor`
+**Mechanic**
+- Registrasi dengan nama bengkel dan login
+- Mencari motor berdasarkan nomor plat, dan mendaftarkan motor untuk pelanggan
+- Antrean pekerjaan hari ini
+- Inspeksi, pencatatan servis, dan lampiran nota
+- Memperbarui pengingat pemilik saat servis disimpan
+- Riwayat servis, statistik (hari ini, minggu ini, bulan ini) dan daftar komponen overdue
+- Rating dan ulasan dari pemilik motor
+- Data pribadi dan data bengkel
 
-## 2. Menjalankan di VS Code
-1. Ekstrak zip ini, lalu di VS Code pilih **File → Open Folder** → folder `motorcyclecare`.
-2. Buka terminal VS Code (**Ctrl + `**) dan jalankan:
-   ```bash
-   flutter create . --platforms=android --project-name motorcyclecare
-   flutter pub get
-   ```
-   Perintah pertama hanya membuat folder `android/`; file di `lib/` tidak ditimpa.
-3. Buka `android/app/src/main/AndroidManifest.xml`, lalu tambahkan baris ini tepat di atas `<application`:
-   ```xml
-   <uses-permission android:name="android.permission.INTERNET"/>
-   ```
-   (Dipakai untuk mengunduh font Plus Jakarta Sans di versi release.)
-4. Pilih device di pojok kanan bawah VS Code (emulator / HP), lalu tekan **F5** atau jalankan `flutter run`.
+**Admin**
+- Registrasi dengan staff code dan login
+- Mengelola user (tambah, ubah, nonaktifkan, hapus)
+- Mengelola katalog motor dan aturan perawatan
+- Laporan sistem dengan ekspor CSV
+- Daftar perubahan terbaru (*recent changes*)
 
-## 3. Build APK
+## Teknologi
+
+- Flutter dan Dart (SDK `>=3.4.0 <4.0.0`)
+- Supabase: Auth, Database (PostgreSQL dengan Row Level Security), Storage, dan Edge Functions
+- Package utama:
+  - `supabase_flutter`: koneksi ke Supabase
+  - `image_picker`: memilih foto nota
+  - `flutter_local_notifications`: notifikasi pengingat
+  - `share_plus`: membagikan laporan CSV
+  - `google_fonts` dan `flutter_svg`: font dan ikon
+
+## Struktur Folder
+
+```
+lib/
+├── main.dart          # entry point, memilih backend demo atau Supabase
+├── app.dart           # MaterialApp dan pemulihan sesi login
+├── config.dart        # URL dan key Supabase dari --dart-define
+├── models/            # model domain, sesuai tabel database
+├── data/              # interface Backend, data demo, dan implementasi Supabase
+├── state/             # AppState: state dan logika aplikasi untuk semua role
+├── services/          # notifikasi pengingat lokal
+├── screens/           # layar aplikasi: auth/, owner/, mechanic/, admin/
+├── theme/             # warna dan tema
+├── widgets/           # komponen UI dan ikon yang dipakai bersama
+└── utils/             # format angka dan tanggal
+supabase/
+├── schema.sql         # tabel, trigger, fungsi, RLS, dan storage policy
+├── seed.sql           # katalog motor, aturan perawatan, bengkel, dan staff code
+├── migration_v2.sql   # migrasi dari skema versi 1
+└── functions/         # Edge Functions admin-create-user dan admin-delete-user
+```
+
+## Menjalankan Aplikasi
+
+**Prasyarat**
+- Flutter SDK 3.22 atau lebih baru
+- Android SDK (melalui Android Studio), dengan emulator atau perangkat Android
+
+**Mode data demo**
+
+```bash
+flutter pub get
+flutter run
+```
+
+Tanpa konfigurasi Supabase, aplikasi berjalan dengan data demo di memori. Data kembali ke kondisi awal setiap
+kali aplikasi dibuka ulang.
+
+**Build APK**
+
 ```bash
 flutter build apk --release
 ```
-Hasilnya: `build/app/outputs/flutter-apk/app-release.apk`
 
-## 4. Akun demo
-Satu aplikasi untuk tiga aktor di use case diagram. Setelah login, aplikasi membuka dashboard sesuai role.
+File APK ada di `build/app/outputs/flutter-apk/app-release.apk`.
 
-| Role | Email | Password | Dashboard |
-|---|---|---|---|
-| Owner (Users/Driver) | rizky@mail.com | rizky123 | My Motorcycles → Dashboard motor |
-| Mechanic | budi@mail.com | budi123 | Mechanic Dashboard (Home · Search · Jobs · Profile) |
-| Admin | dina@mail.com | dina123 | Admin Dashboard (Home · Users · Catalog · Rules · Profile) |
+## Akun Demo
 
-Akun lain di data demo: andi@mail.com, siti.rahma@mail.com, maya@mail.com (owner), dimas@mail.com (mechanic),
-agung@mail.com (admin), wahyu@mail.com (owner, **inactive** — tidak bisa login). Password = nama depan + `123`.
-
-Register akun baru: pilih **Owner / Mechanic / Admin** di layar Create Account. Mechanic mengisi nama bengkel,
-Admin butuh staff code (demo: `ADM-2026`).
-
-> Database Supabase untuk semua role dikerjakan di tahap berikutnya. Untuk sekarang jalankan **tanpa** `supabase.json`
-> (cukup `flutter run`), semua data memakai data demo dan kembali ke awal setiap aplikasi dibuka ulang.
-
-## 5. Layar Figma → file
-Tampilan, warna (token "MotorcycleCare Tokens"), ikon, dan teks mengikuti file Figma
-**MotorcycleCare – User App Prototype**.
-
-| Figma | Activity diagram | File |
+| Role | Email | Password |
 |---|---|---|
-| A1 · Welcome | Open MotorcycleCare → Already have an account? | `screens/welcome_screen.dart` |
-| A3 · Create Account | Register Account → Registration valid? → Create User Account | `screens/register_screen.dart` |
-| A2 / A2b · Log In | Log In → Login successful? → Show login error | `screens/login_screen.dart` |
-| B0 / B1 · My Motorcycles | Manage Motorcycles → already registered? → Select | `screens/motorcycles_screen.dart` |
-| B2 · Add Motorcycle | Add Motorcycle → Motorcycle valid? → Save Motorcycle | `screens/add_motorcycle_screen.dart` |
-| C1 · Motorcycle Dashboard, C2 · Log Out | Motorcycle Dashboard, Log Out | `screens/dashboard_screen.dart`, `screens/sheets.dart` |
-| 02 · Update Odometer, 02b/02c · Confirm | Update odometer? → Save / Use Latest → Confirm Current Odometer | `screens/update_odometer_screen.dart` |
-| 01 · Component Status | Calculate Maintenance Status → View Component Status | `screens/component_status_screen.dart` |
-| 04a–04f · Detail | View Maintenance Schedule | `screens/component_detail_screen.dart` |
-| 05 · Reminders | Receive Maintenance Reminder | `screens/sheets.dart` |
-| 03 · Maintenance History, 06 · Receipt | View Maintenance History | `screens/history_screen.dart`, `screens/sheets.dart` |
-| 07a · Record Maintenance | Record Maintenance → Attach receipt? (skip/attach) | `screens/record_maintenance_screen.dart` |
-| 07c · Maintenance Saved | Save Maintenance Record → Update Maintenance Schedule | `screens/maintenance_saved_screen.dart` |
+| Motorcycle Owner | rizky@mail.com | rizky123 |
+| Mechanic | budi@mail.com | budi123 |
+| Admin | dina@mail.com | dina123 |
 
-Aturan status: **Due soon** saat pemakaian ≥ 80% interval (km atau bulan, mana yang lebih dulu),
-**Overdue** saat ≥ 100%.
+Untuk registrasi akun Admin baru, gunakan staff code `ADM-2026`. Akun demo lainnya tercantum di
+`lib/data/mock_data.dart`.
 
-## 6. Struktur folder (mengikuti diagram draw.io)
-```
-lib/
-  main.dart, app.dart          entry point, login tersimpan → dashboard sesuai role
-  models/models.dart           class diagram: UserAccount + UserRole, CatalogModel, MaintenanceRule,
-                               Motorcycle, MaintenanceRecord (ServiceRecord), Receipt, ServiceJob, Review
-  data/                        Backend (interface), MockBackend (data demo), SupabaseBackend
-  state/app_state.dart         logika per aktor: owner, MechanicState, AdminState
-  screens/
-    home_router.dart           Log In → Login successful? → dashboard Owner / Mechanic / Admin
-    auth/                      Open MotorcycleCare → Already have an account? → Register / Log In
-    owner/                     user activity diagram   (Figma: User App Prototype)
-    mechanic/                  mechanic activity diagram (Figma: Mechanic UI Orange)
-    admin/                     admin activity diagram  (Figma: Admin App)
-  theme/, widgets/, utils/     token warna, komponen, ikon, format angka/tanggal
-test/widget_test.dart          unit test  →  jalankan: flutter test
-```
+## Konfigurasi Supabase (opsional)
 
-### Alur Mechanic (mechanic activity diagram)
-Mechanic Dashboard → Search Motorcycle → *Motorcycle found?* — tidak: **Motorcycle Not Found** (Add Motorcycle /
-Search Again) — ya: **Motorcycle Information** → View Maintenance History → **Inspect & Repair** →
-**Record Service Details** → **Attach Service Receipt?** (Upload / Take Photo / Skip) → **Review Service** →
-*Service record complete?* — tidak: **Correct Details** — ya: **Save Service Record** → Service Record Saved
-(history di-update) → Back to Dashboard → Log Out.
-
-### Alur Admin (admin activity diagram)
-Admin Dashboard → Choose Module (**Users · Motorcycle Catalog · Maintenance Rules**) → View list →
-Add / Edit / Delete → Save Changes → kembali ke dashboard (Recent changes) → Log Out.
-
-## 7. Menghubungkan ke Supabase
-
-Tanpa pengaturan apa pun, app memakai **data demo** (akun Rizky). Untuk memakai database Supabase:
-
-### a. Buat project dan tabel
-1. Buka https://supabase.com/dashboard → **New project** (catat password database-nya).
-2. Buka **SQL Editor → New query**, salin isi `supabase/schema.sql`, lalu klik **Run**.
-3. Buat query baru lagi, salin isi `supabase/seed.sql`, lalu klik **Run** (mengisi katalog motor dan aturan servis).
-4. Buka **Authentication → Sign In / Providers → Email**, matikan **Confirm email**, lalu **Save**.
-   Ini supaya akun baru bisa langsung login saat development. Email bawaan Supabase hanya
-   mengirim ke alamat anggota tim project, jadi tanpa SMTP sendiri email konfirmasi tidak sampai.
-
-### b. Masukkan kunci project ke app
-1. Di dashboard Supabase klik **Connect** (atau **Project Settings → API Keys**).
-2. Salin **Project URL** dan **Publishable key** (`sb_publishable_...`).
-   Jangan pakai *secret key* / *service_role* di aplikasi.
-3. Di folder project, salin `supabase.example.json` menjadi **`supabase.json`**, lalu isi:
-   ```json
-   {
-     "SUPABASE_URL": "https://xxxx.supabase.co",
-     "SUPABASE_KEY": "sb_publishable_..."
-   }
+1. Buat project baru di Supabase.
+2. Di SQL Editor, jalankan `supabase/schema.sql`, lalu `supabase/seed.sql`. Untuk project yang masih memakai
+   skema versi 1, jalankan `supabase/migration_v2.sql` lebih dulu.
+3. Di **Authentication → Sign In / Providers → Email**, matikan **Confirm email**. Pengaturan ini dibutuhkan untuk
+   registrasi Mechanic dan Admin.
+4. Deploy Edge Functions:
+   ```bash
+   npx supabase functions deploy admin-create-user
+   npx supabase functions deploy admin-delete-user
    ```
-4. Tambahkan baris `supabase.json` ke file `.gitignore` supaya kunci tidak ikut ter-upload ke GitHub.
+5. Salin `supabase.example.json` menjadi `supabase.json`, lalu isi `SUPABASE_URL` dan `SUPABASE_KEY` dengan
+   Project URL dan *publishable key*. File `supabase.json` sudah tercantum di `.gitignore` dan tidak boleh
+   di-commit.
+6. Jalankan aplikasi:
+   ```bash
+   flutter run --dart-define-from-file=supabase.json
+   ```
 
-### c. Jalankan
-```bash
-flutter pub get
-flutter run --dart-define-from-file=supabase.json
-```
-Atau di VS Code: buka tab **Run and Debug** (Ctrl + Shift + D), pilih **MotorcycleCare (Supabase)**, lalu tekan F5.
-Pilih **MotorcycleCare (demo data)** untuk kembali ke data demo.
+`.vscode/launch.json` juga menyediakan dua konfigurasi: **MotorcycleCare (Supabase)** dan
+**MotorcycleCare (demo data)**.
 
-### d. Yang tersimpan di Supabase
-| Data | Tempat |
-|---|---|
-| Akun & login | Authentication → Users, tabel `profiles` (role: owner / mechanic / admin) |
-| Katalog & aturan servis | tabel `catalog_models`, `maintenance_rules` (dikelola Admin) |
-| Motor milik user | tabel `motorcycles` |
-| Riwayat servis | tabel `maintenance_records` + `maintenance_record_items` |
-| Foto nota | Storage → bucket `receipts` (privat, per user) |
+## Dokumen Desain
 
-Row Level Security aktif: setiap user hanya bisa melihat dan mengubah motor & riwayat servisnya sendiri.
-Tarik layar **My motorcycles** ke bawah untuk memuat ulang data.
+- `docs/diagrams/MotorcycleCare.drawio`: use case diagram, class diagram, activity diagram (Motorcycle Owner,
+  Mechanic, Admin), sequence diagram, ERD, dan DFD level 0 sampai 2.
+- `docs/CONSISTENCY.md`: pemetaan elemen diagram ke layar, class, dan tabel database.
+- File Figma di root repo: desain antarmuka untuk setiap role.
+  - `MotorcycleCare – User App Prototype.fig`
+  - `MotorcycleCare - Mechanic UI (Orange).fig`
+  - `MotorcycleCare — Admin App.fig`

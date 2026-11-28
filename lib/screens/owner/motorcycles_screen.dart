@@ -8,9 +8,9 @@ import '../../widgets/app_icon.dart';
 import '../../widgets/common.dart';
 import 'add_motorcycle_screen.dart';
 import 'dashboard_screen.dart';
+import 'profile_screen.dart';
 
-/// B1 · My Motorcycles  /  B0 · My Motorcycles – Empty
-/// (Manage Motorcycles → "Motorcycle already registered?" → Select / Add)
+/// The owner's motorcycles, or an empty state with Add Motorcycle.
 class MotorcyclesScreen extends StatelessWidget {
   const MotorcyclesScreen({super.key});
 
@@ -20,7 +20,7 @@ class MotorcyclesScreen extends StatelessWidget {
       );
 
   void _open(BuildContext context, Motorcycle m) {
-    AppScope.read(context).selectMotorcycle(m.id);
+    AppScope.read(context).selectMotorcycle(m.motorcycleId);
     Navigator.of(context).push(DashboardScreen.route());
   }
 
@@ -40,7 +40,9 @@ class MotorcyclesScreen extends StatelessWidget {
 
     if (motos.isEmpty) {
       return AppPage(onRefresh: refresh, children: [
-        const TopBar('My Motorcycles', back: false),
+        TopBar('My Motorcycles', back: false, actions: [
+          SquareButton('user', tooltip: 'Profile & settings', onTap: () => Navigator.of(context).push(OwnerProfileScreen.route())),
+        ]),
         CardBox(
           radius: 20,
           padding: const EdgeInsets.all(24),
@@ -56,7 +58,9 @@ class MotorcyclesScreen extends StatelessWidget {
     }
 
     return AppPage(onRefresh: refresh, children: [
-      const TopBar('My Motorcycles', back: false),
+      TopBar('My Motorcycles', back: false, actions: [
+          SquareButton('user', tooltip: 'Profile & settings', onTap: () => Navigator.of(context).push(OwnerProfileScreen.route())),
+        ]),
       Text('Select a motorcycle to open its dashboard, or add a new one.',
           style: ts(14, regular, AppColors.muted, 1.43)),
       for (final m in motos)
@@ -67,10 +71,10 @@ class MotorcyclesScreen extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
                 Text(app.catalogOf(m).name, style: ts(15, semiBold)),
-                Text('${m.plate} · ${fmtKm(m.odometer)}', style: ts(12, regular, AppColors.muted)),
+                Text('${m.plateNumber} · ${fmtKm(m.currentOdometer)}', style: ts(12, regular, AppColors.muted)),
               ]),
             ),
-            StatusBadge(app.worstHealth(m)),
+            StatusBadge(app.worstStatus(m)),
             const AppIcon('chevR', color: AppColors.muted, size: 16),
           ]),
         ),

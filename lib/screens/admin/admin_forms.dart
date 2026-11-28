@@ -79,11 +79,11 @@ Future<bool> _confirmDelete(BuildContext context, String title, String message, 
   return ok ?? false;
 }
 
-// ====================================================================== C2 Edit user · C4 Add user
+// ====================================================================== Edit user · Add user
 class UserFormScreen extends StatefulWidget {
   const UserFormScreen({super.key, this.user});
 
-  /// null = Add user
+  /// Null when adding a new user.
   final UserAccount? user;
 
   @override
@@ -94,7 +94,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   late final UserAccount? u = widget.user;
   late final _name = TextEditingController(text: u?.fullName ?? '');
   late final _email = TextEditingController(text: u?.email ?? '');
-  late final _workshop = TextEditingController(text: u?.workshopName ?? '');
+  late final _workshop = TextEditingController(text: switch (u) { Mechanic(:final workshopName) => workshopName ?? '', _ => '' });
   final _password = TextEditingController();
   late UserRole? _role = u?.role;
   late bool _active = u?.active ?? true;
@@ -129,16 +129,23 @@ class _UserFormScreenState extends State<UserFormScreen> {
     final nav = Navigator.of(context);
     final String? err;
     if (isNew) {
-      err = await app.addUser(fullName: _name.text, email: _email.text, password: _password.text, role: _role!);
-      if (err == null && _role == UserRole.mechanic) {
-        final created = app.users.lastWhere((x) => x.email == _email.text.trim().toLowerCase());
-        await app.saveUser(created.copyWith(workshopName: _workshop.text.trim()));
-      }
+      err = await app.addUser(
+        fullName: _name.text,
+        email: _email.text,
+        password: _password.text,
+        role: _role!,
+        workshopName: _role == UserRole.mechanic ? _workshop.text.trim() : null,
+      );
     } else {
+      final ws = _workshop.text.trim();
+      final current = u;
       err = await app.saveUser(u!.copyWith(
         fullName: _name.text.trim(),
         role: _role,
-        workshopName: _workshop.text.trim(),
+        // a new workshop name is looked up (or created) by the backend
+        workshop: _role == UserRole.mechanic && (current is! Mechanic || current.workshopName != ws)
+            ? Workshop(workshopId: '', name: ws)
+            : null,
         active: _active,
       ));
     }
@@ -176,15 +183,15 @@ class _UserFormScreenState extends State<UserFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isNew = u == null;
-    final isMe = u?.id == AppScope.of(context).currentUser?.id;
-    final preview = (u ?? const UserAccount(id: '', fullName: '', email: ''))
+    final isMe = u?.userId == AppScope.of(context).currentUser?.userId;
+    final preview = (u ?? const MotorcycleOwner(userId: '', fullName: '', email: ''))
         .copyWith(fullName: _name.text.isEmpty ? (u?.fullName ?? 'New user') : _name.text, role: _role ?? UserRole.owner);
     return AppPage(
       gap: 14,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
         _header(context, isNew ? 'Add user' : 'Edit user',
-            isNew ? null : 'User ID · USR-${u!.id.replaceAll(RegExp(r'[^0-9]'), '').padLeft(4, '0')}'),
+            isNew ? null : 'User ID · USR-${u!.userId.replaceAll(RegExp(r'[^0-9]'), '').padLeft(4, '0')}'),
         if (isNew)
           Text('Create an account for an owner, mechanic or admin. Workshop or staff details can be completed after '
               'the account is created.', style: ts(14, regular, AppColors.muted, 1.45))
@@ -198,6 +205,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   Text(preview.fullName, style: ts(18, bold)),
                   Text(u!.email, style: ts(13, regular, AppColors.muted)),
                   Wrap(spacing: 6, runSpacing: 4, children: [Badge2.role(preview.role), Badge2.active(_active)]),
+                  if (u case Admin(:final staffCode?))
+                    Text('Registered with staff code $staffCode', style: ts(12, regular, AppColors.muted)),
+                  if (u case MotorcycleOwner(:final notificationEnabled))
+                    Text('Maintenance reminders ${notificationEnabled ? 'on' : 'off'}',
+                        style: ts(12, regular, AppColors.muted)),
                 ]),
               ),
             ]),
@@ -301,22 +313,22 @@ class _UserFormScreenState extends State<UserFormScreen> {
   }
 }
 
-// ====================================================================== D2 Edit model · D4 Add model
+// ====================================================================== Edit model · Add model
 class ModelFormScreen extends StatefulWidget {
   const ModelFormScreen({super.key, this.model});
 
-  final CatalogModel? model;
+  final MotorcycleCatalog? model;
 
   @override
   State<ModelFormScreen> createState() => _ModelFormScreenState();
 }
 
 class _ModelFormScreenState extends State<ModelFormScreen> {
-  late final CatalogModel? m = widget.model;
-  late MotoType? _type = m?.type;
+  late final MotorcycleCatalog? m = widget.model;
+  late MotorcycleType? _type = m?.motorcycleType;
   late final _make = TextEditingController(text: m?.make ?? '');
   late final _model = TextEditingController(text: m?.model ?? '');
-  late final _year = TextEditingController(text: m == null ? '' : '${m!.year}');
+  late final _year = TextEditingController(text: m == null ? '' : '${m!.modelYear}');
   bool _busy = false;
   String? _error;
   Map<String, String> _errors = {};
@@ -343,12 +355,12 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
     if (_errors.isNotEmpty) return;
     setState(() => _busy = true);
     final app = AppScope.read(context);
-    final (saved, err) = await app.saveModel(CatalogModel(
-      id: m?.id ?? '',
+    final (saved, err) = await app.saveModel(MotorcycleCatalog(
+      catalogId: m?.catalogId ?? '',
       make: _make.text.trim(),
       model: _model.text.trim(),
-      type: _type!,
-      year: year!,
+      motorcycleType: _type!,
+      modelYear: year!,
     ));
     if (!mounted) return;
     setState(() => _busy = false);
@@ -358,7 +370,7 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
     }
     if (m == null) {
       adminSnack(context, '${saved.name} added to the catalog',
-          action: 'Add rules', onAction: () => AdminShell.goTab(context, 3, ruleModelId: saved.id));
+          action: 'Add rules', onAction: () => AdminShell.goTab(context, 3, ruleModelId: saved.catalogId));
     } else {
       adminSnack(context, 'Model changes saved');
     }
@@ -370,7 +382,7 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
     final ok = await _confirmDelete(
         context,
         'Delete model?',
-        '${m!.name} (${m!.year}) and its $rules maintenance rule${rules == 1 ? '' : 's'} will be removed from the catalog.',
+        '${m!.name} (${m!.modelYear}) and its $rules maintenance rule${rules == 1 ? '' : 's'} will be removed from the catalog.',
         'Delete Model');
     if (!ok || !mounted) return;
     final err = await app.deleteModel(m!);
@@ -387,7 +399,7 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final isNew = m == null;
-    final rules = isNew ? 0 : app.rulesForCatalog(m!.id).length;
+    final rules = isNew ? 0 : app.rulesForCatalog(m!.catalogId).length;
     Widget input(TextEditingController c, String hint, String key, {bool digits = false}) => AppInput(
           controller: c,
           hint: hint,
@@ -402,7 +414,7 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
         _header(context, isNew ? 'Add motorcycle model' : 'Edit model',
-            isNew ? null : 'Catalog ID · CAT-${m!.id.toUpperCase()}'),
+            isNew ? null : 'Catalog ID · CAT-${m!.catalogId.toUpperCase()}'),
         if (isNew)
           Text('New models appear in the user app when owners register a motorcycle. Add maintenance rules afterwards.',
               style: ts(14, regular, AppColors.muted, 1.45))
@@ -414,8 +426,8 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
                   Text(m!.name, style: ts(18, bold)),
-                  Text('Model year ${m!.year}', style: ts(13, regular, AppColors.muted)),
-                  Badge2.type(m!.type),
+                  Text('Model year ${m!.modelYear}', style: ts(13, regular, AppColors.muted)),
+                  Badge2.type(m!.motorcycleType),
                 ]),
               ),
             ]),
@@ -428,7 +440,7 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
               placeholder: 'Select a type',
               error: _errors['type'] != null,
               onTap: () async {
-                final t = await _pick(context, 'Motorcycle type', [for (final t in MotoType.values) (t, t.label, null)], _type);
+                final t = await _pick(context, 'Motorcycle type', [for (final t in MotorcycleType.values) (t, t.label, null)], _type);
                 if (t != null) {
                   setState(() {
                     _type = t;
@@ -443,7 +455,7 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
         _field('Model year', input(_year, 'e.g. 2024', 'year', digits: true), error: _errors['year']),
         if (!isNew) ...[
           CardBox(
-            onTap: () => AdminShell.goTab(context, 3, ruleModelId: m!.id),
+            onTap: () => AdminShell.goTab(context, 3, ruleModelId: m!.catalogId),
             child: Row(spacing: 12, children: [
               const IconBox('sliders', size: 40, radius: 11, iconSize: 18),
               Expanded(
@@ -464,11 +476,11 @@ class _ModelFormScreenState extends State<ModelFormScreen> {
   }
 }
 
-// ====================================================================== E2 Edit rule · E4 Add rule
+// ====================================================================== Edit rule · Add rule
 class RuleFormScreen extends StatefulWidget {
   const RuleFormScreen({super.key, required this.model, this.rule});
 
-  final CatalogModel model;
+  final MotorcycleCatalog model;
   final MaintenanceRule? rule;
 
   @override
@@ -481,7 +493,7 @@ class _RuleFormScreenState extends State<RuleFormScreen> {
   late String? _name = r?.componentName;
   late final _km = TextEditingController(text: r == null ? '' : '${r!.intervalKm}');
   late final _months = TextEditingController(text: r == null ? '' : '${r!.intervalMonths}');
-  late final _source = TextEditingController(text: r?.source ?? "${widget.model.name} Owner's Manual · Periodic maintenance");
+  late final _source = TextEditingController(text: r?.sourceReference ?? "${widget.model.name} Owner's Manual · Periodic maintenance");
   bool _busy = false;
   String? _error;
   Map<String, String> _errors = {};
@@ -509,14 +521,13 @@ class _RuleFormScreenState extends State<RuleFormScreen> {
     if (_errors.isNotEmpty) return;
     setState(() => _busy = true);
     final err = await AppScope.read(context).saveRule(MaintenanceRule(
-      id: r?.id ?? '',
-      catalogId: widget.model.id,
+      ruleId: r?.ruleId ?? '',
+      catalogId: widget.model.catalogId,
       componentKey: _key!,
       componentName: _name!,
       intervalKm: km!,
       intervalMonths: months!,
-      source: _source.text.trim(),
-      price: r?.price ?? 0,
+      sourceReference: _source.text.trim(),
     ));
     if (!mounted) return;
     setState(() => _busy = false);
@@ -551,7 +562,7 @@ class _RuleFormScreenState extends State<RuleFormScreen> {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final isNew = r == null;
-    final used = {for (final x in app.rulesForCatalog(widget.model.id)) if (x.id != r?.id) x.componentKey};
+    final used = {for (final x in app.rulesForCatalog(widget.model.catalogId)) if (x.ruleId != r?.ruleId) x.componentKey};
     final km = int.tryParse(_km.text);
     final months = int.tryParse(_months.text);
     Widget numInput(TextEditingController c, String key, String? suffix) => AppInput(
@@ -566,7 +577,7 @@ class _RuleFormScreenState extends State<RuleFormScreen> {
       gap: 14,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
-        _header(context, isNew ? 'Add maintenance rule' : 'Edit rule', isNew ? null : 'Rule ID · ${r!.id}'),
+        _header(context, isNew ? 'Add maintenance rule' : 'Edit rule', isNew ? null : 'Rule ID · R-${r!.ruleId}'),
         if (isNew)
           Text('Choose a component. Recommended intervals fill in automatically and can be edited later.',
               style: ts(14, regular, AppColors.muted, 1.45))
@@ -579,7 +590,7 @@ class _RuleFormScreenState extends State<RuleFormScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 3, children: [
                   Text(r!.componentName, style: ts(18, bold)),
                   Text(widget.model.name, style: ts(13, regular, AppColors.muted)),
-                  Badge2.type(widget.model.type),
+                  Badge2.type(widget.model.motorcycleType),
                 ]),
               ),
             ]),

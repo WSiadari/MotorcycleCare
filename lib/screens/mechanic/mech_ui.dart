@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../models/models.dart';
 import '../../widgets/app_icon.dart';
 
-/// Colours of the "MotorcycleCare – Mechanic UI (Orange)" Figma file.
+/// Colors of the mechanic app.
 class MC {
   MC._();
 
@@ -81,7 +81,7 @@ class MechPage extends StatelessWidget {
   }
 }
 
-/// "Header": back button + title.
+/// Header with a back button and title.
 class MechHeader extends StatelessWidget {
   const MechHeader(this.title, {super.key, this.onBack, this.trailing});
 
@@ -97,7 +97,7 @@ class MechHeader extends StatelessWidget {
       ]);
 }
 
-/// "Tab Header": title only (screens in the bottom navigation).
+/// Header with a title only (bottom navigation tabs).
 class MechTabHeader extends StatelessWidget {
   const MechTabHeader(this.title, {super.key});
 
@@ -283,10 +283,10 @@ class Avatar extends StatelessWidget {
 class StatusChip extends StatelessWidget {
   const StatusChip(this.label, {super.key, required this.bg, required this.fg, this.dot = true});
 
-  factory StatusChip.health(Health h) => switch (h) {
-        Health.overdue => const StatusChip('Overdue', bg: MC.dangerBg, fg: MC.danger),
-        Health.dueSoon => const StatusChip('Due Soon', bg: MC.warnBg, fg: MC.warn),
-        Health.onTrack => const StatusChip('OK', bg: MC.okBg, fg: MC.ok),
+  factory StatusChip.status(MaintenanceStatus h) => switch (h) {
+        MaintenanceStatus.overdue => const StatusChip('Overdue', bg: MC.dangerBg, fg: MC.danger),
+        MaintenanceStatus.dueSoon => const StatusChip('Due Soon', bg: MC.warnBg, fg: MC.warn),
+        MaintenanceStatus.onTrack => const StatusChip('OK', bg: MC.okBg, fg: MC.ok),
       };
 
   factory StatusChip.ok(String label) => StatusChip(label, bg: MC.okBg, fg: MC.ok);
@@ -306,13 +306,13 @@ class StatusChip extends StatelessWidget {
       );
 }
 
-Color healthBar(Health h) => switch (h) {
-      Health.overdue => MC.danger,
-      Health.dueSoon => MC.warnBar,
-      Health.onTrack => MC.okBar,
+Color statusBar(MaintenanceStatus h) => switch (h) {
+      MaintenanceStatus.overdue => MC.danger,
+      MaintenanceStatus.dueSoon => MC.warnBar,
+      MaintenanceStatus.onTrack => MC.okBar,
     };
 
-/// "Motorcycle Pill": Honda Vario 160 · B 4521 KXR
+/// Motorcycle pill: Honda Vario 160 · B 4521 KXR
 class MotoPill extends StatelessWidget {
   const MotoPill(this.text, {super.key});
 
@@ -374,7 +374,7 @@ class ProgressBar extends StatelessWidget {
       );
 }
 
-/// Stats "Tile": big number + label.
+/// Stat tile: big number and label.
 class StatTile extends StatelessWidget {
   const StatTile(this.value, this.label, {super.key, this.valueColor = MC.text, this.highlight = false, this.onTap});
 
@@ -558,7 +558,7 @@ class SelectBox extends StatelessWidget {
 }
 
 // ------------------------------------------------------------------ sheet
-/// "Overlay" bottom sheet: grabber, title, close button.
+/// Bottom sheet with grabber, title and close button.
 Future<T?> showMechSheet<T>(BuildContext context, {required String title, required List<Widget> Function(BuildContext) children}) {
   return showModalBottomSheet<T>(
     context: context,

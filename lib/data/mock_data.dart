@@ -1,23 +1,23 @@
 import '../models/models.dart';
 
-/// Demo data, identical to the "MotorcycleCare – User App Prototype" Figma file:
-/// Honda Vario 160 · B 4521 KXR, registered 2 Feb 2026 at 0 km, 8,450 km on 21 Nov 2026.
+/// Demo data. The main motorcycle is a Honda Vario 160 (B 4521 KXR), registered on 2 Feb 2026 at
+/// 0 km and at 8,450 km on 21 Nov 2026. Catalog, rules, workshops and staff code match supabase/seed.sql.
 class MockData {
   MockData._();
 
-  static const catalog = <CatalogModel>[
-    CatalogModel(id: 'vario', make: 'Honda', model: 'Vario 160', type: MotoType.matic, year: 2023),
-    CatalogModel(id: 'pcx', make: 'Honda', model: 'PCX 160', type: MotoType.matic, year: 2024),
-    CatalogModel(id: 'nmax', make: 'Yamaha', model: 'NMAX 155', type: MotoType.matic, year: 2023),
-    CatalogModel(id: 'beat', make: 'Honda', model: 'BeAT', type: MotoType.matic, year: 2023),
-    CatalogModel(id: 'address', make: 'Suzuki', model: 'Address', type: MotoType.matic, year: 2022),
-    CatalogModel(id: 'supra', make: 'Honda', model: 'Supra X 125', type: MotoType.underbone, year: 2022),
-    CatalogModel(id: 'r15', make: 'Yamaha', model: 'R15', type: MotoType.sport, year: 2023),
+  static const catalog = <MotorcycleCatalog>[
+    MotorcycleCatalog(catalogId: 'vario', make: 'Honda', model: 'Vario 160', motorcycleType: MotorcycleType.matic, modelYear: 2023),
+    MotorcycleCatalog(catalogId: 'pcx', make: 'Honda', model: 'PCX 160', motorcycleType: MotorcycleType.matic, modelYear: 2024),
+    MotorcycleCatalog(catalogId: 'nmax', make: 'Yamaha', model: 'NMAX 155', motorcycleType: MotorcycleType.matic, modelYear: 2023),
+    MotorcycleCatalog(catalogId: 'beat', make: 'Honda', model: 'BeAT', motorcycleType: MotorcycleType.matic, modelYear: 2023),
+    MotorcycleCatalog(catalogId: 'address', make: 'Suzuki', model: 'Address', motorcycleType: MotorcycleType.matic, modelYear: 2022),
+    MotorcycleCatalog(catalogId: 'supra', make: 'Honda', model: 'Supra X 125', motorcycleType: MotorcycleType.underbone, modelYear: 2022),
+    MotorcycleCatalog(catalogId: 'r15', make: 'Yamaha', model: 'R15', motorcycleType: MotorcycleType.sport, modelYear: 2023),
   ];
 
-  // key, name, km, months, typical price (for sample receipts)
-  static const _templates = <MotoType, List<(String, String, int, int, int)>>{
-    MotoType.matic: [
+  // key, name, km, months, typical price (only for the sample receipts)
+  static const _templates = <MotorcycleType, List<(String, String, int, int, int)>>{
+    MotorcycleType.matic: [
       ('gear', 'Gear Oil', 4000, 6, 25000),
       ('engine', 'Engine Oil', 2000, 3, 58000),
       ('air', 'Air Filter', 8000, 12, 72000),
@@ -25,21 +25,21 @@ class MockData {
       ('brake', 'Brake Pads', 12000, 12, 65000),
       ('cvt', 'CVT Belt', 24000, 24, 180000),
     ],
-    MotoType.underbone: [
+    MotorcycleType.underbone: [
       ('engine', 'Engine Oil', 2000, 3, 50000),
       ('air', 'Air Filter', 8000, 12, 45000),
       ('spark', 'Spark Plug', 8000, 12, 25000),
       ('chain', 'Drive Chain', 4000, 6, 30000),
       ('brake', 'Brake Pads', 12000, 12, 55000),
     ],
-    MotoType.trail: [
+    MotorcycleType.trail: [
       ('engine', 'Engine Oil', 1500, 2, 60000),
       ('air', 'Air Filter', 3000, 3, 50000),
       ('spark', 'Spark Plug', 6000, 12, 30000),
       ('chain', 'Drive Chain', 500, 1, 30000),
       ('brake', 'Brake Pads', 8000, 12, 70000),
     ],
-    MotoType.sport: [
+    MotorcycleType.sport: [
       ('engine', 'Engine Oil', 3000, 4, 95000),
       ('air', 'Air Filter', 10000, 12, 85000),
       ('spark', 'Spark Plug', 10000, 12, 60000),
@@ -53,61 +53,111 @@ class MockData {
     final rules = <MaintenanceRule>[];
     var id = 1001;
     for (final m in catalog) {
-      for (final t in _templates[m.type]!) {
+      for (final t in _templates[m.motorcycleType]!) {
         rules.add(MaintenanceRule(
-          id: 'R-${id++}',
-          catalogId: m.id,
+          ruleId: '${id++}',
+          catalogId: m.catalogId,
           componentKey: t.$1,
           componentName: t.$2,
           intervalKm: t.$3,
           intervalMonths: t.$4,
-          price: t.$5,
-          source: "Owner's manual",
+          sourceReference: "Owner's manual",
         ));
       }
     }
     return rules;
   }
 
-  /// Demo accounts — one per actor of the use case diagram.
-  static final users = <UserAccount>[
-    UserAccount(id: 'u1', fullName: 'Rizky Yudha', email: 'rizky@mail.com', password: 'rizky123',
-        createdAt: DateTime(2026, 2, 2)),
-    UserAccount(id: 'u2', fullName: 'Budi Santoso', email: 'budi@mail.com', password: 'budi123',
-        role: UserRole.mechanic, workshopName: 'Maju Jaya Motor', phone: '+62 812-3456-7890',
-        createdAt: DateTime(2025, 6, 1)),
-    UserAccount(id: 'u3', fullName: 'Dina Pratama', email: 'dina@mail.com', password: 'dina123',
-        role: UserRole.admin, createdAt: DateTime(2025, 1, 10)),
-    UserAccount(id: 'u4', fullName: 'Andi Pratama', email: 'andi@mail.com', password: 'andi123',
-        createdAt: DateTime(2026, 3, 4)),
-    UserAccount(id: 'u5', fullName: 'Siti Rahma', email: 'siti.rahma@mail.com', password: 'siti123',
-        createdAt: DateTime(2026, 4, 12)),
-    UserAccount(id: 'u6', fullName: 'Maya Lestari', email: 'maya@mail.com', password: 'maya123',
-        createdAt: DateTime(2026, 5, 20)),
-    UserAccount(id: 'u7', fullName: 'Dodi Kurniawan', email: 'dodi@mail.com', password: 'dodi123',
-        createdAt: DateTime(2026, 6, 2)),
-    UserAccount(id: 'u8', fullName: 'Hendra Gunawan', email: 'hendra@mail.com', password: 'hendra123',
-        createdAt: DateTime(2026, 7, 9)),
-    UserAccount(id: 'u9', fullName: 'Dimas Prakoso', email: 'dimas@mail.com', password: 'dimas123',
-        role: UserRole.mechanic, workshopName: 'AHASS Sudirman', createdAt: DateTime(2026, 11, 20)),
-    UserAccount(id: 'u10', fullName: 'Muhammad Agung', email: 'agung@mail.com', password: 'agung123',
-        role: UserRole.admin, createdAt: DateTime(2025, 3, 3)),
-    UserAccount(id: 'u11', fullName: 'Wahyu Siadari', email: 'wahyu@mail.com', password: 'wahyu123',
-        active: false, createdAt: DateTime(2026, 8, 30)),
+  static final _rules = buildRules();
+
+  static String ruleIdOf(String catalogId, String componentKey) =>
+      _rules.firstWhere((r) => r.catalogId == catalogId && r.componentKey == componentKey).ruleId;
+
+  /// Typical workshop price of a component, used to draw the sample receipts.
+  static int samplePrice(MotorcycleType type, String componentKey) =>
+      _templates[type]!.where((t) => t.$1 == componentKey).firstOrNull?.$5 ?? 0;
+
+  static const workshops = [
+    Workshop(
+        workshopId: 'w1',
+        name: 'Maju Jaya Motor',
+        address: 'Jl. Raya Bekasi No. 45',
+        city: 'Jakarta Timur',
+        hours: 'Mon–Sat · 08:00–17:00',
+        phone: '+62 21 4455 6677'),
+    Workshop(
+        workshopId: 'w2',
+        name: 'AHASS Sudirman',
+        address: 'Jl. Jend. Sudirman No. 12',
+        city: 'Jakarta Pusat',
+        hours: 'Mon–Sat · 08:00–16:00',
+        phone: '+62 21 5700 1122'),
   ];
 
-  /// Staff codes that let someone register an Admin account (demo).
+  /// Demo accounts for each role (passwords in [passwords]).
+  static List<UserAccount> buildUsers() {
+    final now = DateTime.now();
+    UserAccount owner(String id, String name, String email, DateTime at, {bool active = true}) =>
+        MotorcycleOwner(userId: id, fullName: name, email: email, createdAt: at, active: active);
+    return [
+      owner('u1', 'Rizky Yudha', 'rizky@mail.com', DateTime(2026, 2, 2)),
+      Mechanic(
+          userId: 'u2',
+          fullName: 'Budi Santoso',
+          email: 'budi@mail.com',
+          phone: '+62 812-3456-7890',
+          workshop: workshops[0],
+          createdAt: DateTime(2025, 6, 1)),
+      Admin(userId: 'u3', fullName: 'Dina Pratama', email: 'dina@mail.com', staffCode: 'ADM-2026', createdAt: DateTime(2025, 1, 10)),
+      owner('u4', 'Andi Pratama', 'andi@mail.com', DateTime(2026, 3, 4)),
+      owner('u5', 'Siti Rahma', 'siti.rahma@mail.com', DateTime(2026, 4, 12)),
+      owner('u6', 'Maya Lestari', 'maya@mail.com', DateTime(2026, 5, 20)),
+      owner('u7', 'Dodi Kurniawan', 'dodi@mail.com', DateTime(2026, 6, 2)),
+      owner('u8', 'Hendra Gunawan', 'hendra@mail.com', DateTime(2026, 7, 9)),
+      Mechanic(
+          userId: 'u9',
+          fullName: 'Dimas Prakoso',
+          email: 'dimas@mail.com',
+          workshop: workshops[1],
+          createdAt: DateTime(now.year, now.month, now.day).subtract(const Duration(days: 2))),
+      Admin(userId: 'u10', fullName: 'Muhammad Agung', email: 'agung@mail.com', createdAt: DateTime(2025, 3, 3)),
+      owner('u11', 'Wahyu Siadari', 'wahyu@mail.com', DateTime(2026, 8, 30), active: false),
+      Mechanic(
+          userId: 'u12',
+          fullName: 'Eko Saputra',
+          email: 'eko@mail.com',
+          workshop: workshops[1],
+          createdAt: DateTime(2025, 12, 1)),
+    ];
+  }
+
+  /// Password = first name + "123" (Supabase Auth keeps real passwords).
+  static const passwords = {
+    'rizky@mail.com': 'rizky123',
+    'budi@mail.com': 'budi123',
+    'dina@mail.com': 'dina123',
+    'andi@mail.com': 'andi123',
+    'siti.rahma@mail.com': 'siti123',
+    'maya@mail.com': 'maya123',
+    'dodi@mail.com': 'dodi123',
+    'hendra@mail.com': 'hendra123',
+    'dimas@mail.com': 'dimas123',
+    'agung@mail.com': 'agung123',
+    'wahyu@mail.com': 'wahyu123',
+    'eko@mail.com': 'eko123',
+  };
+
+  /// Staff codes that let someone register an Admin account (same as seed.sql).
   static const staffCodes = {'ADM-2026'};
 
   static Motorcycle _m(String id, String owner, String cat, String plate, int odo, DateTime reg) => Motorcycle(
-        id: id,
+        motorcycleId: id,
         ownerId: owner,
         catalogId: cat,
-        plate: plate,
-        odometer: odo,
-        odometerUpdatedAt: DateTime(2026, 11, 21),
-        registrationOdometer: 0,
-        registeredAt: reg,
+        plateNumber: plate,
+        currentOdometer: odo,
+        odometerUpdatedAt: DateTime(2026, 11, 21, 7, 45),
+        createdAt: reg,
       );
 
   static List<Motorcycle> buildMotorcycles() => [
@@ -120,69 +170,112 @@ class MockData {
         _m('m7', 'u7', 'r15', 'B 3745 FRT', 9800, DateTime(2026, 6, 2)),
       ];
 
-  static List<MaintenanceRecord> buildRecords() {
+  /// First reading at registration (0 km), the latest one on 21 Nov 2026, and the history of B 4521 KXR.
+  static List<OdometerReading> buildReadings() {
+    var n = 1;
+    OdometerReading r(String moto, int km, DateTime at, String by) =>
+        OdometerReading(readingId: 'o${n++}', motorcycleId: moto, valueKm: km, recordedAt: at, recordedBy: by);
+    final list = <OdometerReading>[
+      r('m1', 0, DateTime(2026, 2, 2, 10), 'u1'),
+      r('m1', 2700, DateTime(2026, 5, 20, 9, 10), 'u1'),
+      r('m1', 4200, DateTime(2026, 6, 14, 8, 30), 'u1'),
+      r('m1', 4700, DateTime(2026, 8, 5, 18), 'u1'),
+      r('m1', 6700, DateTime(2026, 9, 28, 9), 'u1'),
+      r('m1', 8450, DateTime(2026, 11, 21, 7, 45), 'u1'),
+    ];
+    for (final m in buildMotorcycles().skip(1)) {
+      list.add(r(m.motorcycleId, 0, m.createdAt, m.ownerId));
+      list.add(r(m.motorcycleId, m.currentOdometer, m.odometerUpdatedAt, m.ownerId));
+    }
+    return list;
+  }
+
+  static const _catalogOf = {
+    'm1': 'vario',
+    'm2': 'nmax',
+    'm3': 'beat',
+    'm4': 'address',
+    'm5': 'pcx',
+    'm6': 'supra',
+    'm7': 'r15',
+  };
+
+  static List<ServiceRecordItem> _items(String recordId, String moto, Map<String, String> work) => [
+        for (final (i, e) in work.entries.indexed)
+          ServiceRecordItem(
+            itemId: '$recordId-${i + 1}',
+            recordId: recordId,
+            ruleId: ruleIdOf(_catalogOf[moto]!, e.key),
+            componentKey: e.key,
+            workDescription: e.value,
+          ),
+      ];
+
+  static ServiceReceipt _receipt(String recordId, String file, DateTime at) =>
+      ServiceReceipt(receiptId: 'rc-$recordId', recordId: recordId, fileName: file, uploadedAt: at);
+
+  static List<ServiceRecord> buildRecords() {
     final now = DateTime.now();
     final day = DateTime(now.year, now.month, now.day);
-    MaintenanceRecord budi(String id, String moto, int daysAgo, int km, Map<String, String> items, int hour, int min,
-            {bool receipt = true}) =>
-        MaintenanceRecord(
-          id: id,
-          motorcycleId: moto,
-          date: day.subtract(Duration(days: daysAgo)),
-          odometer: km,
-          items: items,
-          workshop: 'Maju Jaya Motor',
-          recordedBy: 'u2',
-          recordedByName: 'Budi Santoso',
-          createdAt: day.subtract(Duration(days: daysAgo)).add(Duration(hours: hour, minutes: min)),
-          receipt: receipt ? Receipt(name: 'receipt_$id.jpg', isSample: true) : null,
+
+    // Earlier services of the Vario by Eko Saputra (AHASS Sudirman).
+    ServiceRecord eko(String id, DateTime date, int km, Map<String, String> work, String file) => ServiceRecord(
+          recordId: id,
+          motorcycleId: 'm1',
+          mechanicId: 'u12',
+          recordedByUserId: 'u12',
+          recordedByName: 'Eko Saputra',
+          serviceDate: date,
+          odometerKm: km,
+          workshopName: 'AHASS Sudirman',
+          createdAt: date.add(const Duration(hours: 10)),
+          items: _items(id, 'm1', work),
+          receipt: _receipt(id, file, date.add(const Duration(hours: 10))),
         );
+
+    // Services by Budi Santoso (mechanic demo account), relative to today.
+    ServiceRecord budi(String id, String moto, int daysAgo, int km, Map<String, String> work, int hour, int min,
+        {bool receipt = true}) {
+      final at = day.subtract(Duration(days: daysAgo)).add(Duration(hours: hour, minutes: min));
+      return ServiceRecord(
+        recordId: id,
+        motorcycleId: moto,
+        mechanicId: 'u2',
+        recordedByUserId: 'u2',
+        recordedByName: 'Budi Santoso',
+        serviceDate: day.subtract(Duration(days: daysAgo)),
+        odometerKm: km,
+        workshopName: 'Maju Jaya Motor',
+        createdAt: at,
+        items: _items(id, moto, work),
+        receipt: receipt ? _receipt(id, 'receipt_$id.jpg', at) : null,
+      );
+    }
+
     return [
-      MaintenanceRecord(
-        id: 'r1',
+      eko('r1', DateTime(2026, 5, 20), 2700, {'engine': 'Replaced engine oil (0.8 L)'}, 'nota_ahass_200526.jpg'),
+      eko(
+          'r2',
+          DateTime(2026, 6, 14),
+          4200,
+          {
+            'gear': 'Replaced gear oil (120 ml)',
+            'air': 'Replaced air filter element',
+            'spark': 'Replaced spark plug (NGK)',
+            'brake': 'Replaced front brake pads',
+          },
+          'nota_ahass_140626.jpg'),
+      ServiceRecord(
+        recordId: 'r3',
         motorcycleId: 'm1',
-        date: DateTime(2026, 5, 20),
-        odometer: 2700,
-        workshop: 'AHASS Sudirman',
-        recordedByName: 'AHASS Sudirman',
-        items: const {'engine': 'Replaced engine oil (0.8 L)'},
-        receipt: const Receipt(name: 'nota_ahass_200526.jpg', isSample: true),
-      ),
-      MaintenanceRecord(
-        id: 'r2',
-        motorcycleId: 'm1',
-        date: DateTime(2026, 6, 14),
-        odometer: 4200,
-        workshop: 'AHASS Sudirman',
-        recordedByName: 'AHASS Sudirman',
-        items: const {
-          'gear': 'Replaced gear oil (120 ml)',
-          'air': 'Replaced air filter element',
-          'spark': 'Replaced spark plug (NGK)',
-          'brake': 'Replaced front brake pads',
-        },
-        receipt: const Receipt(name: 'nota_ahass_140626.jpg', isSample: true),
-      ),
-      MaintenanceRecord(
-        id: 'r3',
-        motorcycleId: 'm1',
-        date: DateTime(2026, 8, 5),
-        odometer: 4700,
-        recordedBy: 'u1',
+        recordedByUserId: 'u1',
         recordedByName: 'Rizky Yudha',
-        items: const {'engine': 'Replaced engine oil (self-service)'},
+        serviceDate: DateTime(2026, 8, 5),
+        odometerKm: 4700,
+        createdAt: DateTime(2026, 8, 5, 18),
+        items: _items('r3', 'm1', {'engine': 'Replaced engine oil (self-service)'}),
       ),
-      MaintenanceRecord(
-        id: 'r4',
-        motorcycleId: 'm1',
-        date: DateTime(2026, 9, 28),
-        odometer: 6700,
-        workshop: 'AHASS Sudirman',
-        recordedByName: 'AHASS Sudirman',
-        items: const {'engine': 'Replaced engine oil (0.8 L)'},
-        receipt: const Receipt(name: 'nota_ahass_280926.jpg', isSample: true),
-      ),
-      // Services by Budi Santoso (mechanic demo account), relative to today.
+      eko('r4', DateTime(2026, 9, 28), 6700, {'engine': 'Replaced engine oil (0.8 L)'}, 'nota_ahass_280926.jpg'),
       budi('b1', 'm5', 0, 7600, {'engine': 'Engine oil change'}, 8, 20),
       budi('b2', 'm7', 0, 9800, {'brake': 'Brake pads replaced'}, 9, 45),
       budi('b3', 'm6', 0, 15400, {'air': 'Air filter replaced'}, 11, 10),
@@ -201,7 +294,7 @@ class MockData {
     final now = DateTime.now();
     final at = DateTime(now.year, now.month, now.day, 7, 30);
     ServiceJob j(String id, String moto, String note, JobStatus s) =>
-        ServiceJob(id: id, motorcycleId: moto, mechanicId: 'u2', note: note, status: s, createdAt: at);
+        ServiceJob(jobId: id, motorcycleId: moto, mechanicId: 'u2', note: note, status: s, createdAt: at);
     return [
       j('j1', 'm1', 'Oil + plug', JobStatus.inProgress),
       j('j2', 'm2', 'Brake pads', JobStatus.inProgress),
@@ -213,32 +306,41 @@ class MockData {
 
   static List<Review> buildReviews() {
     final now = DateTime.now();
+    Review r(String id, String owner, String name, int rating, String comment, int daysAgo) => Review(
+        reviewId: id,
+        mechanicId: 'u2',
+        ownerId: owner,
+        ownerName: name,
+        rating: rating,
+        comment: comment,
+        createdAt: now.subtract(Duration(days: daysAgo)));
     return [
-      Review(ownerName: 'Andi Pratama', rating: 5, comment: 'Fast and neat work. Explained everything clearly.',
-          createdAt: now.subtract(const Duration(days: 2))),
-      Review(ownerName: 'Siti Rahma', rating: 5, comment: 'Receipt was attached right away. Very transparent.',
-          createdAt: now.subtract(const Duration(days: 7))),
-      Review(ownerName: 'Dodi Kurniawan', rating: 4, comment: 'Good service, a little wait during peak hours.',
-          createdAt: now.subtract(const Duration(days: 14))),
+      r('v1', 'u4', 'Andi Pratama', 5, 'Fast and neat work. Explained everything clearly.', 2),
+      r('v2', 'u5', 'Siti Rahma', 5, 'Receipt was attached right away. Very transparent.', 7),
+      r('v3', 'u7', 'Dodi Kurniawan', 4, 'Good service, a little wait during peak hours.', 14),
     ];
   }
 
-  static const workshops = [
-    Workshop(
-        name: 'Maju Jaya Motor',
-        address: 'Jl. Raya Bekasi No. 45',
-        city: 'Jakarta Timur',
-        hours: 'Mon–Sat · 08:00–17:00',
-        phone: '+62 21 4455 6677',
-        closesAt: '17:00'),
-    Workshop(
-        name: 'AHASS Sudirman',
-        address: 'Jl. Jend. Sudirman No. 12',
-        city: 'Jakarta Pusat',
-        hours: 'Mon–Sat · 08:00–16:00',
-        phone: '+62 21 5700 1122',
-        closesAt: '16:00'),
-  ];
+  static List<ActivityLog> buildActivityLogs() {
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day);
+    return [
+      ActivityLog(
+          logId: 'l1',
+          actorId: 'u9',
+          title: 'New mechanic registered',
+          subtitle: 'AHASS Sudirman',
+          icon: 'wrench',
+          createdAt: day.subtract(const Duration(days: 2)).add(const Duration(hours: 9))),
+      ActivityLog(
+          logId: 'l2',
+          actorId: 'u10',
+          title: 'Model added',
+          subtitle: 'Suzuki Address · 2022',
+          icon: 'bike',
+          createdAt: day.subtract(const Duration(days: 9)).add(const Duration(hours: 14))),
+    ];
+  }
 
   /// Line labels used on the sample receipts.
   static const receiptLabels = {
@@ -270,8 +372,7 @@ const defaultWorkDescription = {
   'coolant': 'Replaced coolant',
 };
 
-/// Components the admin can add as a rule, with recommended intervals
-/// ("Recommended intervals fill in automatically and can be edited later").
+/// Components the admin can add as a rule, with recommended intervals.
 const componentPresets = <(String key, String name, int km, int months)>[
   ('engine', 'Engine Oil', 2000, 3),
   ('gear', 'Gear Oil', 4000, 6),

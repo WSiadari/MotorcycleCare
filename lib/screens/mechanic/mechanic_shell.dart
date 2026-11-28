@@ -9,9 +9,9 @@ import 'mech_more.dart';
 import 'mech_ui.dart';
 
 /// "Honda Vario 160 · B 4521 KXR"
-String motoLine(AppState app, Motorcycle m) => '${app.catalogOf(m).name} · ${m.plate}';
+String motoLine(AppState app, Motorcycle m) => '${app.catalogOf(m).name} · ${m.plateNumber}';
 
-/// Mechanic Activity Diagram: Log In → Mechanic Dashboard (Home · Search · Jobs · Profile).
+/// Mechanic app with bottom navigation (Home · Search · Jobs · Profile).
 class MechanicShell extends StatefulWidget {
   const MechanicShell({super.key});
 
@@ -93,7 +93,7 @@ class _MechanicShellState extends State<MechanicShell> {
   }
 }
 
-// ====================================================================== 01 Dashboard
+// ====================================================================== Dashboard
 class _HomeTab extends StatelessWidget {
   const _HomeTab({required this.onTab});
 
@@ -125,14 +125,14 @@ class _HomeTab extends StatelessWidget {
             child: const AppIcon('wrench', color: Colors.white, size: 16),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text('Motorcycle Care', style: mt(14, mXBold, MC.accentText))),
+          Expanded(child: Text('MotorcycleCare', style: mt(14, mXBold, MC.accentText))),
           GestureDetector(
             onTap: () => push(const WorkshopScreen()),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                   color: MC.soft, borderRadius: BorderRadius.circular(999), border: Border.all(color: MC.softBorder)),
-              child: Text(me.workshopName ?? 'No workshop', style: mt(11, mBold, MC.accentText)),
+              child: Text(app.currentMechanic?.workshopName ?? 'No workshop', style: mt(11, mBold, MC.accentText)),
             ),
           ),
         ]),
@@ -212,9 +212,9 @@ class _HomeTab extends StatelessWidget {
               MechRow(
                 icon: 'bike',
                 title: app.catalogOf(m).name,
-                subtitle: '${m.plate} · ${r.description.isEmpty ? 'Service' : r.description}',
+                subtitle: '${m.plateNumber} · ${r.description.isEmpty ? 'Service' : r.description}',
                 trailing: StatusChip.ok('Saved'),
-                onTap: () => push(MotorcycleInfoScreen(motorcycleId: m.id)),
+                onTap: () => push(MotorcycleInfoScreen(motorcycleId: m.motorcycleId)),
               ),
       ],
     );
@@ -241,13 +241,13 @@ class _Quick extends StatelessWidget {
       );
 }
 
-/// Plate scanning needs a text-recognition module that is not part of this version.
+/// Camera plate scanning is not implemented; opens the plate search instead.
 void scanPlate(BuildContext context) {
   MechanicShell.goTab(context, 1);
   mechSnack(context, 'Camera plate scanning is not available yet. Type the plate number instead.');
 }
 
-// ====================================================================== 02 Search Motorcycle
+// ====================================================================== Search Motorcycle
 class SearchTab extends StatefulWidget {
   const SearchTab({super.key, this.focus});
 
@@ -267,7 +267,7 @@ class _SearchTabState extends State<SearchTab> {
     super.dispose();
   }
 
-  /// Search Motorcycle → Motorcycle Found? → Yes: Motorcycle Information · No: Motorcycle Not Found
+  /// Opens the motorcycle information, or the not-found screen when the plate is unknown.
   void _search([String? plate]) {
     final value = plate ?? _plate.text;
     if (value.trim().isEmpty) {
@@ -281,7 +281,7 @@ class _SearchTabState extends State<SearchTab> {
     FocusScope.of(context).unfocus();
     final m = app.findByPlate(normalized);
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => m == null ? NotFoundScreen(plate: normalized) : MotorcycleInfoScreen(motorcycleId: m.id),
+      builder: (_) => m == null ? NotFoundScreen(plate: normalized) : MotorcycleInfoScreen(motorcycleId: m.motorcycleId),
     ));
   }
 
@@ -328,10 +328,10 @@ class _SearchTabState extends State<SearchTab> {
           for (final m in recent)
             MechRow(
               icon: 'clock',
-              title: m.plate,
+              title: m.plateNumber,
               subtitle: app.catalogOf(m).name,
               trailing: const AppIcon('chevR', color: MC.muted, size: 18),
-              onTap: () => _search(m.plate),
+              onTap: () => _search(m.plateNumber),
             ),
         ],
       ],
@@ -339,7 +339,7 @@ class _SearchTabState extends State<SearchTab> {
   }
 }
 
-// ====================================================================== 13 Today's Jobs
+// ====================================================================== Today's Jobs
 class _JobsTab extends StatefulWidget {
   const _JobsTab();
 
@@ -383,13 +383,13 @@ class _JobsTabState extends State<_JobsTab> {
               titleSize: 13,
               highlight: i == 0 && j.status == JobStatus.inProgress,
               title: app.catalogOf(m).name,
-              subtitle: '${m.plate} · ${j.note}',
+              subtitle: '${m.plateNumber} · ${j.note}',
               trailing: j.status == JobStatus.inProgress
                   ? const StatusChip('In Progress', bg: MC.soft, fg: MC.accentText)
                   : const StatusChip('Waiting', bg: MC.warnBg, fg: MC.warn),
               onTap: () {
-                app.findByPlate(m.plate);
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => MotorcycleInfoScreen(motorcycleId: m.id)));
+                app.findByPlate(m.plateNumber);
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => MotorcycleInfoScreen(motorcycleId: m.motorcycleId)));
               },
             ),
       ],
@@ -397,7 +397,7 @@ class _JobsTabState extends State<_JobsTab> {
   }
 }
 
-// ====================================================================== 15 Profile
+// ====================================================================== Profile
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab();
 
@@ -421,7 +421,7 @@ class _ProfileTab extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
                   color: MC.soft, borderRadius: BorderRadius.circular(999), border: Border.all(color: MC.softBorder)),
-              child: Text('Mechanic · ${me.workshopName ?? 'No workshop'}', style: mt(12, mBold, MC.accentText)),
+              child: Text('Mechanic · ${app.currentMechanic?.workshopName ?? 'No workshop'}', style: mt(12, mBold, MC.accentText)),
             ),
           ]),
         ),

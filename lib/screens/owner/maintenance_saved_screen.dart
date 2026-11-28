@@ -10,13 +10,13 @@ import 'component_detail_screen.dart';
 import 'component_status_screen.dart';
 import 'dashboard_screen.dart';
 
-/// 07c · Maintenance Saved → Update Maintenance Schedule
+/// Confirmation after a maintenance record is saved.
 class MaintenanceSavedScreen extends StatelessWidget {
   const MaintenanceSavedScreen({super.key, required this.record});
 
-  final MaintenanceRecord record;
+  final ServiceRecord record;
 
-  static Route<void> route(MaintenanceRecord record) => MaterialPageRoute(
+  static Route<void> route(ServiceRecord record) => MaterialPageRoute(
         builder: (_) => MaintenanceSavedScreen(record: record),
         settings: const RouteSettings(name: '/saved'),
       );
@@ -37,7 +37,7 @@ class MaintenanceSavedScreen extends StatelessWidget {
     final app = AppScope.of(context);
     final moto = app.selected!;
     final n = record.items.length;
-    final rules = app.rulesFor(moto).where((r) => record.items.containsKey(r.componentKey)).toList();
+    final rules = app.rulesFor(moto).where((r) => record.covers(r.componentKey)).toList();
     final first = rules.first;
 
     return AppPage(
@@ -54,18 +54,18 @@ class MaintenanceSavedScreen extends StatelessWidget {
         ),
         Text('Maintenance saved', textAlign: TextAlign.center, style: ts(22, bold)),
         Text(
-          '$n component${n == 1 ? '' : 's'} updated · ${fmtDate(record.date)} · ${fmtKm(record.odometer)} · '
+          '$n component${n == 1 ? '' : 's'} updated · ${fmtDate(record.serviceDate)} · ${fmtKm(record.odometerKm)} · '
           '${record.receipt != null ? 'receipt attached' : 'no receipt'}',
           textAlign: TextAlign.center,
           style: ts(14, regular, AppColors.muted, 1.43),
         ),
-        SectionHeader('Updated schedule'),
+        const SectionHeader('Updated schedule'),
         CardBox(
           child: Column(spacing: 12, children: [
             for (final r in rules)
               Builder(builder: (_) {
                 final s = app.statusOf(moto, r);
-                final st = HealthStyle.of(s.health);
+                final st = StatusStyle.of(s.status);
                 return Row(spacing: 12, children: [
                   IconBox(componentIconName(r.componentKey), size: 32, radius: 9, iconSize: 16, bg: st.iconBg, color: st.icon),
                   Expanded(
@@ -74,7 +74,7 @@ class MaintenanceSavedScreen extends StatelessWidget {
                       Text(scheduleLine(s), style: ts(12, regular, AppColors.muted)),
                     ]),
                   ),
-                  StatusBadge(s.health),
+                  StatusBadge(s.status),
                 ]);
               }),
           ]),
